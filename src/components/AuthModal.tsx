@@ -11,7 +11,11 @@ import {
 } from 'lucide-react';
 import { AuthUser } from '../types';
 import { signInWithGoogleOAuth, signOutGoogle } from '../services/googleAuth';
-import { ensureCardsLibraryFile, ensureCardsSetsFile } from '../services/googleSheetsService';
+import {
+  ensureCardsLibraryFile,
+  ensureCardsSetsFile,
+  ensureCardsFoldersFile,
+} from '../services/googleSheetsService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -49,11 +53,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const userName = user.displayName || userEmail.split('@')[0];
       const userPicture = user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userEmail)}`;
 
-      setStatusMessage('Checking Google Drive for "cards_library" & "cards_sets"...');
+      setStatusMessage('Checking Google Drive for "cards_library", "cards_sets" & "cards_folders"...');
 
-      // 2. Check or create cards_library and cards_sets files in Google Drive / Sheets
+      // 2. Check or create cards_library, cards_sets, and cards_folders files in Google Drive / Sheets
       await ensureCardsLibraryFile(accessToken);
       await ensureCardsSetsFile(accessToken);
+      await ensureCardsFoldersFile(accessToken);
 
       const authUser: AuthUser = {
         id: user.uid,
@@ -101,7 +106,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 Google Sheets Connection
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                cards_library &amp; cards_sets
+                cards_library, cards_sets &amp; cards_folders
               </p>
             </div>
           </div>

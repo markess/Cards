@@ -32,7 +32,7 @@ import { MatchMode } from './components/StudyModes/MatchMode';
 import { TestMode } from './components/StudyModes/TestMode';
 import { WriteMode } from './components/StudyModes/WriteMode';
 import { AboutView } from './components/AboutView';
-import { FileSpreadsheet, ArrowRight, Loader2, Sparkles, Info } from 'lucide-react';
+import { FileSpreadsheet, ArrowRight, Loader2, Sparkles, Info, CheckCircle2 } from 'lucide-react';
 
 type ViewState =
   | { view: 'home' }
@@ -96,30 +96,55 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Load sets from Google Sheets whenever user is logged in AND has an active Google token
-  useEffect(() => {
-    let isMounted = true;
-    async function loadSheetsData() {
-      if (!currentUser || !hasGoogleToken) return;
-      try {
-        const sheetsSets = await api.getSets();
-        if (isMounted && sheetsSets.length > 0) {
-          setSets(sheetsSets);
-        }
-      } catch (err) {
-        console.warn('Could not load sets from Google Sheets:', err);
-      }
-    }
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    loadSheetsData();
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUser, hasGoogleToken]);
+  // Full two-way synchronization for Sets and Folders
+  const performSync = useCallback(async (showToast = false) => {
+    const hasToken = !!getCachedGoogleToken();
+    if (!currentUser || !hasToken) return;
+
+    setIsSyncing(true);
+    setConnectionStatus('Синхронизация карточек и папок с Google Sheets...');
+    try {
+      const currentSets = getStoredSets();
+      const currentFolders = getStoredFolders();
+      const { sets: mergedSets, folders: mergedFolders } = await api.syncAll(currentSets, currentFolders);
+      setSets(mergedSets);
+      setFolders(mergedFolders);
+      setConnectionStatus(null);
+      if (showToast) {
+        setSyncToast({
+          message: `Синхронизировано: ${mergedSets.length} сетов, ${mergedFolders.length} папок`,
+          type: 'success',
+        });
+        setTimeout(() => setSyncToast(null), 3500);
+      }
+    } catch (e) {
+      console.warn('Sync failed:', e);
+      setConnectionStatus(null);
+      if (showToast) {
+        setSyncToast({
+          message: 'Ошибка синхронизации с Google Sheets. Попробуйте снова.',
+          type: 'error',
+        });
+        setTimeout(() => setSyncToast(null), 3500);
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [currentUser]);
+
+  // Synchronize whenever user is logged in AND has an active Google token
+  useEffect(() => {
+    if (currentUser && hasGoogleToken) {
+      performSync(false);
+    }
+  }, [currentUser, hasGoogleToken, performSync]);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
 
-  // Directly sign in with Google account & setup cards_library / cards_sets
+  // Directly sign in with Google account & setup cards_library / cards_sets / cards_folders
   const handleDirectSignIn = async () => {
     setIsConnectingGoogle(true);
     setConnectionStatus('Opening Google account selector...');
@@ -129,7 +154,7 @@ export default function App() {
       const userName = user.displayName || userEmail.split('@')[0];
       const userPicture = user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userEmail)}`;
 
-      setConnectionStatus('Checking Google Drive for "cards_library" & "cards_sets"...');
+      setConnectionStatus('Проверка Google Drive (cards_library, cards_sets, cards_folders)...');
       await api.initializeGoogleSheetsFiles();
 
       const authUser: AuthUser = {
@@ -144,11 +169,8 @@ export default function App() {
       setCurrentUser(authUser);
       localStorage.setItem('cards_auth_user', JSON.stringify(authUser));
 
-      // Refresh sets from the Google Sheets
-      const sheetsSets = await api.getSets();
-      if (sheetsSets.length > 0) {
-        setSets(sheetsSets);
-      }
+      // Refresh and two-way sync all sets and folders
+      await performSync(true);
       setConnectionStatus(null);
     } catch (e: any) {
       console.error('Direct Google Sign-in Error:', e);
@@ -165,10 +187,7 @@ export default function App() {
     setCurrentUser(user);
     try {
       localStorage.setItem('cards_auth_user', JSON.stringify(user));
-      const sheetsSets = await api.getSets();
-      if (sheetsSets.length > 0) {
-        setSets(sheetsSets);
-      }
+      await performSync(true);
     } catch (e) {
       console.error(e);
     }
@@ -355,7 +374,25 @@ export default function App() {
         currentView={viewState.view}
         isDark={isDark}
         onToggleTheme={toggleTheme}
+        onSync={() => performSync(true)}
+        isSyncing={isSyncing}
       />
+
+      {/* Sync Status Toast */}
+      {syncToast && (
+        <div className="fixed bottom-5 right-5 z-50 animate-fade-in pointer-events-none">
+          <div
+            className={`px-4 py-2.5 rounded-xl shadow-xl border text-xs font-semibold flex items-center gap-2 ${
+              syncToast.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-emerald-600/30'
+                : 'bg-red-600 text-white border-red-700 shadow-red-600/30'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{syncToast.message}</span>
+          </div>
+        </div>
+      )}
 
       {/* Session notice banner if Google token is not active in memory */}
       {currentUser && !hasGoogleToken && (

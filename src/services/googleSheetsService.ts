@@ -9,6 +9,15 @@ interface GoogleDriveFile {
   name: string;
 }
 
+// In-memory cache for resolved file IDs to minimize roundtrips and avoid picking duplicate empty files
+const fileIdCache: Record<string, string> = {};
+const sheetTitleCache: Record<string, string> = {};
+
+export function clearSheetsFileCache(): void {
+  Object.keys(fileIdCache).forEach((k) => delete fileIdCache[k]);
+  Object.keys(sheetTitleCache).forEach((k) => delete sheetTitleCache[k]);
+}
+
 function getAuthHeaders(tokenOverride?: string): HeadersInit {
   const token = tokenOverride || getCachedGoogleToken();
   if (!token) {
@@ -21,12 +30,39 @@ function getAuthHeaders(tokenOverride?: string): HeadersInit {
 }
 
 /**
- * Find file by name in Google Drive
+ * Get the title of the first sheet in a spreadsheet (handles localized names like 'Лист1', 'Sheet1', etc.)
+ */
+async function getFirstSheetTitle(spreadsheetId: string, tokenOverride?: string): Promise<string> {
+  if (sheetTitleCache[spreadsheetId]) {
+    return sheetTitleCache[spreadsheetId];
+  }
+  try {
+    const headers = getAuthHeaders(tokenOverride);
+    const res = await fetch(`${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets.properties.title`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const title = data.sheets?.[0]?.properties?.title || 'Sheet1';
+      sheetTitleCache[spreadsheetId] = title;
+      return title;
+    }
+  } catch {
+    // fallback
+  }
+  return 'Sheet1';
+}
+
+/**
+ * Find file by name in Google Drive.
+ * Uses orderBy=modifiedTime desc so if multiple copies exist, the most recently updated one is selected.
  */
 async function findSpreadsheetByName(fileName: string, tokenOverride?: string): Promise<string | null> {
   const token = tokenOverride || getCachedGoogleToken();
   if (!token) {
     return null;
+  }
+
+  if (fileIdCache[fileName]) {
+    return fileIdCache[fileName];
   }
 
   let headers: HeadersInit;
@@ -38,11 +74,12 @@ async function findSpreadsheetByName(fileName: string, tokenOverride?: string): 
 
   // Escaping single quotes in file name for query
   const query = encodeURIComponent(`name = '${fileName}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
-  const url = `${DRIVE_API_BASE}/files?q=${query}&fields=files(id,name)&spaces=drive`;
+  const url = `${DRIVE_API_BASE}/files?q=${query}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
 
   const res = await fetch(url, { headers });
   if (res.status === 401) {
     clearGoogleToken();
+    clearSheetsFileCache();
     console.warn(`[Google Drive] Session expired or invalid (401) while querying for "${fileName}".`);
     throw new Error('AUTH_EXPIRED');
   }
@@ -56,6 +93,7 @@ async function findSpreadsheetByName(fileName: string, tokenOverride?: string): 
   const data = await res.json();
   const files: GoogleDriveFile[] = data.files || [];
   if (files.length > 0) {
+    fileIdCache[fileName] = files[0].id;
     return files[0].id;
   }
   return null;
@@ -167,6 +205,28 @@ export async function ensureCardsSetsFile(tokenOverride?: string): Promise<strin
 }
 
 /**
+ * Ensure `cards_folders` spreadsheet exists.
+ * Structure of cards_folders:
+ * - Columns: [Folder ID, Name, Description, Color, Created At]
+ */
+export async function ensureCardsFoldersFile(tokenOverride?: string): Promise<string> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) return '';
+
+  let fileId = await findSpreadsheetByName('cards_folders', tokenOverride);
+  if (!fileId) {
+    console.log('[Google Sheets] cards_folders not found. Creating new spreadsheet...');
+    fileId = await createSpreadsheet(
+      'cards_folders',
+      ['Folder ID', 'Name', 'Description', 'Color', 'Created At'],
+      tokenOverride
+    );
+    console.log('[Google Sheets] cards_folders created with ID:', fileId);
+  }
+  return fileId;
+}
+
+/**
  * Read all study sets directly from `cards_sets` in Google Sheets
  */
 export async function loadSetsFromGoogleSheets(tokenOverride?: string): Promise<StudySet[]> {
@@ -179,13 +239,15 @@ export async function loadSetsFromGoogleSheets(tokenOverride?: string): Promise<
     const setsFileId = await ensureCardsSetsFile(tokenOverride);
     if (!setsFileId) return [];
 
+    const sheetTitle = await getFirstSheetTitle(setsFileId, tokenOverride);
     const headers = getAuthHeaders(tokenOverride);
-    const range = 'Sheet1!A2:I';
+    const range = encodeURIComponent(`'${sheetTitle}'!A2:I`);
     const url = `${SHEETS_API_BASE}/${setsFileId}/values/${range}`;
 
     const res = await fetch(url, { headers });
     if (res.status === 401) {
       clearGoogleToken();
+      clearSheetsFileCache();
       throw new Error('AUTH_EXPIRED');
     }
     if (!res.ok) {
@@ -218,14 +280,14 @@ export async function loadSetsFromGoogleSheets(tokenOverride?: string): Promise<
         let terms: any[] = [];
         if (row[6]) {
           try {
-            terms = JSON.parse(row[6]);
+            terms = typeof row[6] === 'string' ? JSON.parse(row[6]) : row[6];
           } catch (e) {
             console.warn('Error parsing terms JSON for set', id, e);
           }
         }
 
-        const createdAt = Number(row[7]) || Date.now();
-        const updatedAt = Number(row[8]) || Date.now();
+        const createdAt = Number(row[7]) || (row[7] ? new Date(row[7]).getTime() : Date.now());
+        const updatedAt = Number(row[8]) || (row[8] ? new Date(row[8]).getTime() : Date.now());
 
         sets.push({
           id,
@@ -234,7 +296,7 @@ export async function loadSetsFromGoogleSheets(tokenOverride?: string): Promise<
           folderId,
           author,
           tags,
-          terms,
+          terms: Array.isArray(terms) ? terms : [],
           createdAt,
           updatedAt,
         });
@@ -257,6 +319,70 @@ export async function loadSetsFromGoogleSheets(tokenOverride?: string): Promise<
 }
 
 /**
+ * Read all folders directly from `cards_folders` in Google Sheets
+ */
+export async function loadFoldersFromGoogleSheets(tokenOverride?: string): Promise<Folder[]> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) {
+    return [];
+  }
+
+  try {
+    const foldersFileId = await ensureCardsFoldersFile(tokenOverride);
+    if (!foldersFileId) return [];
+
+    const sheetTitle = await getFirstSheetTitle(foldersFileId, tokenOverride);
+    const headers = getAuthHeaders(tokenOverride);
+    const range = encodeURIComponent(`'${sheetTitle}'!A2:E`);
+    const url = `${SHEETS_API_BASE}/${foldersFileId}/values/${range}`;
+
+    const res = await fetch(url, { headers });
+    if (res.status === 401) {
+      clearGoogleToken();
+      clearSheetsFileCache();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) {
+      console.warn('[Google Sheets] Failed to read cards_folders values:', await res.text());
+      return [];
+    }
+
+    const data = await res.json();
+    const rows: any[][] = data.values || [];
+
+    const folders: Folder[] = [];
+    for (const row of rows) {
+      if (!row || row.length === 0 || !row[0]) continue;
+      try {
+        const id = String(row[0]);
+        const name = String(row[1] || 'New Folder');
+        const description = row[2] ? String(row[2]) : undefined;
+        const color = String(row[3] || 'indigo');
+        const createdAt = Number(row[4]) || (row[4] ? new Date(row[4]).getTime() : Date.now());
+
+        folders.push({
+          id,
+          name,
+          description,
+          color,
+          createdAt,
+        });
+      } catch (e) {
+        console.warn('Failed parsing folder row from sheets:', e);
+      }
+    }
+
+    return folders;
+  } catch (err: any) {
+    if (err?.message === 'AUTH_EXPIRED' || err?.message === 'AUTH_MISSING') {
+      return [];
+    }
+    console.warn('[Google Sheets] Load folders encountered non-fatal error:', err);
+    return [];
+  }
+}
+
+/**
  * Save a set to Google Sheets:
  * 1. Ensure `cards_library` exists and update or append summary row
  * 2. Ensure `cards_sets` exists and update or append full row (with Terms JSON)
@@ -271,12 +397,16 @@ export async function saveSetToGoogleSheets(set: StudySet, tokenOverride?: strin
     if (!libraryFileId || !setsFileId) return;
 
     const headers = getAuthHeaders(tokenOverride);
+    const setsSheetTitle = await getFirstSheetTitle(setsFileId, tokenOverride);
+    const libSheetTitle = await getFirstSheetTitle(libraryFileId, tokenOverride);
 
     // 1. Process `cards_sets`
-    const setsRangeUrl = `${SHEETS_API_BASE}/${setsFileId}/values/Sheet1!A2:A`;
+    const setsRange = encodeURIComponent(`'${setsSheetTitle}'!A2:A`);
+    const setsRangeUrl = `${SHEETS_API_BASE}/${setsFileId}/values/${setsRange}`;
     const existingSetsRes = await fetch(setsRangeUrl, { headers });
     if (existingSetsRes.status === 401) {
       clearGoogleToken();
+      clearSheetsFileCache();
       throw new Error('AUTH_EXPIRED');
     }
     const existingSetsData = await existingSetsRes.json();
@@ -304,7 +434,8 @@ export async function saveSetToGoogleSheets(set: StudySet, tokenOverride?: strin
 
     if (setRowIndex > 0) {
       // Update existing row
-      const updateUrl = `${SHEETS_API_BASE}/${setsFileId}/values/Sheet1!A${setRowIndex}:I${setRowIndex}?valueInputOption=USER_ENTERED`;
+      const updateRange = encodeURIComponent(`'${setsSheetTitle}'!A${setRowIndex}:I${setRowIndex}`);
+      const updateUrl = `${SHEETS_API_BASE}/${setsFileId}/values/${updateRange}?valueInputOption=USER_ENTERED`;
       await fetch(updateUrl, {
         method: 'PUT',
         headers,
@@ -312,7 +443,8 @@ export async function saveSetToGoogleSheets(set: StudySet, tokenOverride?: strin
       });
     } else {
       // Append new row
-      const appendUrl = `${SHEETS_API_BASE}/${setsFileId}/values/Sheet1!A:I:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+      const appendRange = encodeURIComponent(`'${setsSheetTitle}'!A:I`);
+      const appendUrl = `${SHEETS_API_BASE}/${setsFileId}/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
       await fetch(appendUrl, {
         method: 'POST',
         headers,
@@ -321,10 +453,12 @@ export async function saveSetToGoogleSheets(set: StudySet, tokenOverride?: strin
     }
 
     // 2. Process `cards_library` (summary file)
-    const libRangeUrl = `${SHEETS_API_BASE}/${libraryFileId}/values/Sheet1!A2:A`;
+    const libRange = encodeURIComponent(`'${libSheetTitle}'!A2:A`);
+    const libRangeUrl = `${SHEETS_API_BASE}/${libraryFileId}/values/${libRange}`;
     const existingLibRes = await fetch(libRangeUrl, { headers });
     if (existingLibRes.status === 401) {
       clearGoogleToken();
+      clearSheetsFileCache();
       throw new Error('AUTH_EXPIRED');
     }
     const existingLibData = await existingLibRes.json();
@@ -351,14 +485,16 @@ export async function saveSetToGoogleSheets(set: StudySet, tokenOverride?: strin
     ];
 
     if (libRowIndex > 0) {
-      const updateUrl = `${SHEETS_API_BASE}/${libraryFileId}/values/Sheet1!A${libRowIndex}:I${libRowIndex}?valueInputOption=USER_ENTERED`;
+      const updateRange = encodeURIComponent(`'${libSheetTitle}'!A${libRowIndex}:I${libRowIndex}`);
+      const updateUrl = `${SHEETS_API_BASE}/${libraryFileId}/values/${updateRange}?valueInputOption=USER_ENTERED`;
       await fetch(updateUrl, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ values: [libRowValues] }),
       });
     } else {
-      const appendUrl = `${SHEETS_API_BASE}/${libraryFileId}/values/Sheet1!A:I:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+      const appendRange = encodeURIComponent(`'${libSheetTitle}'!A:I`);
+      const appendUrl = `${SHEETS_API_BASE}/${libraryFileId}/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
       await fetch(appendUrl, {
         method: 'POST',
         headers,
@@ -373,6 +509,116 @@ export async function saveSetToGoogleSheets(set: StudySet, tokenOverride?: strin
       return;
     }
     console.warn('[Google Sheets] Failed saving to Google Sheets (saved locally):', e);
+  }
+}
+
+/**
+ * Save a folder to Google Sheets (`cards_folders`)
+ */
+export async function saveFolderToGoogleSheets(folder: Folder, tokenOverride?: string): Promise<void> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) return;
+
+  try {
+    const foldersFileId = await ensureCardsFoldersFile(tokenOverride);
+    if (!foldersFileId) return;
+
+    const headers = getAuthHeaders(tokenOverride);
+    const sheetTitle = await getFirstSheetTitle(foldersFileId, tokenOverride);
+
+    const range = encodeURIComponent(`'${sheetTitle}'!A2:A`);
+    const checkUrl = `${SHEETS_API_BASE}/${foldersFileId}/values/${range}`;
+    const checkRes = await fetch(checkUrl, { headers });
+    if (checkRes.status === 401) {
+      clearGoogleToken();
+      clearSheetsFileCache();
+      throw new Error('AUTH_EXPIRED');
+    }
+    const checkData = await checkRes.json();
+    const rows: string[][] = checkData.values || [];
+
+    let rowIndex = -1;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][0] === folder.id) {
+        rowIndex = i + 2;
+        break;
+      }
+    }
+
+    const folderRow = [
+      folder.id,
+      folder.name,
+      folder.description || '',
+      folder.color || 'indigo',
+      folder.createdAt || Date.now(),
+    ];
+
+    if (rowIndex > 0) {
+      const updateRange = encodeURIComponent(`'${sheetTitle}'!A${rowIndex}:E${rowIndex}`);
+      const updateUrl = `${SHEETS_API_BASE}/${foldersFileId}/values/${updateRange}?valueInputOption=USER_ENTERED`;
+      await fetch(updateUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ values: [folderRow] }),
+      });
+    } else {
+      const appendRange = encodeURIComponent(`'${sheetTitle}'!A:E`);
+      const appendUrl = `${SHEETS_API_BASE}/${foldersFileId}/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+      await fetch(appendUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ values: [folderRow] }),
+      });
+    }
+
+    console.log(`[Google Sheets] Folder "${folder.name}" successfully synced to cards_folders!`);
+  } catch (e: any) {
+    if (e?.message === 'AUTH_EXPIRED') {
+      console.warn('[Google Sheets] Google session expired during folder save.');
+      return;
+    }
+    console.warn('[Google Sheets] Failed saving folder to Google Sheets:', e);
+  }
+}
+
+/**
+ * Delete a folder from Google Sheets (`cards_folders`)
+ */
+export async function deleteFolderFromGoogleSheets(folderId: string, tokenOverride?: string): Promise<void> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) return;
+
+  try {
+    const foldersFileId = await ensureCardsFoldersFile(tokenOverride);
+    if (!foldersFileId) return;
+
+    const headers = getAuthHeaders(tokenOverride);
+    const sheetTitle = await getFirstSheetTitle(foldersFileId, tokenOverride);
+
+    const range = encodeURIComponent(`'${sheetTitle}'!A2:A`);
+    const checkUrl = `${SHEETS_API_BASE}/${foldersFileId}/values/${range}`;
+    const checkRes = await fetch(checkUrl, { headers });
+    if (checkRes.status === 401) {
+      clearGoogleToken();
+      clearSheetsFileCache();
+      return;
+    }
+    const checkData = await checkRes.json();
+    const rows: string[][] = checkData.values || [];
+
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][0] === folderId) {
+        const rowNum = i + 2;
+        const clearRange = encodeURIComponent(`'${sheetTitle}'!A${rowNum}:E${rowNum}`);
+        await fetch(`${SHEETS_API_BASE}/${foldersFileId}/values/${clearRange}:clear`, {
+          method: 'POST',
+          headers,
+        });
+        break;
+      }
+    }
+  } catch (err) {
+    console.warn('[Google Sheets] Failed deleting folder from sheets:', err);
   }
 }
 
@@ -402,12 +648,16 @@ export async function deleteSetFromGoogleSheets(setId: string, tokenOverride?: s
     if (!libraryFileId || !setsFileId) return;
 
     const headers = getAuthHeaders(tokenOverride);
+    const setsSheetTitle = await getFirstSheetTitle(setsFileId, tokenOverride);
+    const libSheetTitle = await getFirstSheetTitle(libraryFileId, tokenOverride);
 
     // Clear in cards_sets
     try {
-      const setsRes = await fetch(`${SHEETS_API_BASE}/${setsFileId}/values/Sheet1!A2:A`, { headers });
+      const setsRange = encodeURIComponent(`'${setsSheetTitle}'!A2:A`);
+      const setsRes = await fetch(`${SHEETS_API_BASE}/${setsFileId}/values/${setsRange}`, { headers });
       if (setsRes.status === 401) {
         clearGoogleToken();
+        clearSheetsFileCache();
         return;
       }
       const setsData = await setsRes.json();
@@ -415,7 +665,8 @@ export async function deleteSetFromGoogleSheets(setId: string, tokenOverride?: s
       for (let i = 0; i < rows.length; i++) {
         if (rows[i][0] === setId) {
           const rowNum = i + 2;
-          await fetch(`${SHEETS_API_BASE}/${setsFileId}/values/Sheet1!A${rowNum}:I${rowNum}:clear`, {
+          const clearRange = encodeURIComponent(`'${setsSheetTitle}'!A${rowNum}:I${rowNum}`);
+          await fetch(`${SHEETS_API_BASE}/${setsFileId}/values/${clearRange}:clear`, {
             method: 'POST',
             headers,
           });
@@ -428,9 +679,11 @@ export async function deleteSetFromGoogleSheets(setId: string, tokenOverride?: s
 
     // Clear in cards_library
     try {
-      const libRes = await fetch(`${SHEETS_API_BASE}/${libraryFileId}/values/Sheet1!A2:A`, { headers });
+      const libRange = encodeURIComponent(`'${libSheetTitle}'!A2:A`);
+      const libRes = await fetch(`${SHEETS_API_BASE}/${libraryFileId}/values/${libRange}`, { headers });
       if (libRes.status === 401) {
         clearGoogleToken();
+        clearSheetsFileCache();
         return;
       }
       const libData = await libRes.json();
@@ -438,7 +691,8 @@ export async function deleteSetFromGoogleSheets(setId: string, tokenOverride?: s
       for (let i = 0; i < rows.length; i++) {
         if (rows[i][0] === setId) {
           const rowNum = i + 2;
-          await fetch(`${SHEETS_API_BASE}/${libraryFileId}/values/Sheet1!A${rowNum}:I${rowNum}:clear`, {
+          const clearRange = encodeURIComponent(`'${libSheetTitle}'!A${rowNum}:I${rowNum}`);
+          await fetch(`${SHEETS_API_BASE}/${libraryFileId}/values/${clearRange}:clear`, {
             method: 'POST',
             headers,
           });

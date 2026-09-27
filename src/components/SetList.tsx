@@ -181,7 +181,15 @@ export const SetList: React.FC<SetListProps> = ({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div
+            className={`grid gap-5 w-full ${
+              filteredSets.length === 1
+                ? 'grid-cols-1'
+                : filteredSets.length === 2
+                ? 'grid-cols-1 md:grid-cols-2'
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}
+          >
             {filteredSets.map((studySet) => {
               const folder = getFolder(studySet.folderId);
               const starredCount = studySet.terms.filter((t) => t.starred).length;
@@ -190,21 +198,21 @@ export const SetList: React.FC<SetListProps> = ({
                 <div
                   key={studySet.id}
                   onClick={() => onSelectSet(studySet, 'overview')}
-                  className="group relative p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between"
+                  className="group relative p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between w-full"
                 >
-                  <div>
+                  <div className="space-y-2">
                     {/* Header line: folder and card count */}
-                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center justify-between gap-2 mb-2">
                       {folder ? (
                         <span
-                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                          className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white shadow-xs"
                           style={{ backgroundColor: folder.color }}
                         >
-                          <FolderIcon className="w-2.5 h-2.5" />
+                          <FolderIcon className="w-3 h-3" />
                           <span>{folder.name}</span>
                         </span>
                       ) : (
-                        <span className="text-[10px] font-semibold text-slate-400">
+                        <span className="text-xs font-semibold text-slate-400">
                           Study Set
                         </span>
                       )}
@@ -215,17 +223,17 @@ export const SetList: React.FC<SetListProps> = ({
                     </div>
 
                     {/* Set Title */}
-                    <h3 className="font-bold text-base text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
+                    <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
                       {studySet.title}
                     </h3>
 
                     {/* Set Description */}
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                       {studySet.description || 'No description provided.'}
                     </p>
 
                     {/* Tags & Voice */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
                         <Volume2 className="w-2.5 h-2.5" />
                         <span>{getVoiceConfigFromTags(studySet.tags).name}</span>
@@ -234,7 +242,7 @@ export const SetList: React.FC<SetListProps> = ({
                       {studySet.tags && studySet.tags.length > 0 &&
                         studySet.tags
                           .filter((t) => !['EN-FEMALE', 'EN-MALE', 'ES-FEMALE', 'ES-MALE', 'FR-FEMALE', 'FR-MALE'].includes(t.toUpperCase()))
-                          .slice(0, 2)
+                          .slice(0, 4)
                           .map((tag, i) => (
                             <span
                               key={i}
@@ -248,7 +256,7 @@ export const SetList: React.FC<SetListProps> = ({
 
                   {/* Quick study mode launchers */}
                   <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -256,9 +264,10 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'flashcards');
                         }}
                         title="Start Flashcards"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <Layers className="w-4 h-4" />
+                        <Layers className="w-4 h-4 text-indigo-500" />
+                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Cards</span>
                       </button>
 
                       <button
@@ -268,9 +277,10 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'learn');
                         }}
                         title="Start Cortex Learn"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <Sparkles className="w-4 h-4" />
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Learn</span>
                       </button>
 
                       <button
@@ -280,9 +290,10 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'match');
                         }}
                         title="Start Match Race"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <Gamepad2 className="w-4 h-4" />
+                        <Gamepad2 className="w-4 h-4 text-emerald-500" />
+                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Match</span>
                       </button>
 
                       <button
@@ -292,15 +303,16 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'test');
                         }}
                         title="Practice Test"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <FileCheck2 className="w-4 h-4" />
+                        <FileCheck2 className="w-4 h-4 text-purple-500" />
+                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Test</span>
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-1 transition-transform">
+                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-1 transition-transform">
                       <span>Study</span>
-                      <Play className="w-3 h-3 fill-indigo-600 dark:fill-indigo-400" />
+                      <Play className="w-3.5 h-3.5 fill-indigo-600 dark:fill-indigo-400" />
                     </div>
                   </div>
                 </div>

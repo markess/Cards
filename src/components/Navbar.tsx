@@ -10,7 +10,8 @@ import {
   FolderPlus,
   User,
   ShieldCheck,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 import { AuthUser, UserStats } from '../types';
 
@@ -28,6 +29,8 @@ interface NavbarProps {
   currentView?: string;
   isDark: boolean;
   onToggleTheme: () => void;
+  onSync?: () => void;
+  isSyncing?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -44,6 +47,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentView,
   isDark,
   onToggleTheme,
+  onSync,
+  isSyncing = false,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b backdrop-blur-md transition-colors bg-white/80 border-slate-200 dark:bg-slate-900/80 dark:border-slate-800">
@@ -154,6 +159,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Google Auth & User Database Button */}
           {currentUser ? (
             <div className="flex items-center gap-1.5 p-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm">
+              {onSync && (
+                <button
+                  onClick={onSync}
+                  disabled={isSyncing}
+                  title="Синхронизировать с Google Sheets (cards_library, cards_sets, cards_folders)"
+                  className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600 dark:text-indigo-400' : ''}`} />
+                </button>
+              )}
+
               <button
                 onClick={onOpenAuth}
                 title={`Logged in as ${currentUser.name} (${currentUser.email})`}
