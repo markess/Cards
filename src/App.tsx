@@ -17,7 +17,7 @@ import {
   saveStoredStats,
 } from './utils/storage';
 import { api } from './services/api';
-import { signInWithGoogleOAuth } from './services/googleAuth';
+import { signInWithGoogleOAuth, signOutGoogle, getCachedGoogleToken, subscribeAuth } from './services/googleAuth';
 import { Navbar } from './components/Navbar';
 import { SetList } from './components/SetList';
 import { SetDetail } from './components/SetDetail';
@@ -31,13 +31,15 @@ import { LearnMode } from './components/StudyModes/LearnMode';
 import { MatchMode } from './components/StudyModes/MatchMode';
 import { TestMode } from './components/StudyModes/TestMode';
 import { WriteMode } from './components/StudyModes/WriteMode';
-import { FileSpreadsheet, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { AboutView } from './components/AboutView';
+import { FileSpreadsheet, ArrowRight, Loader2, Sparkles, Info } from 'lucide-react';
 
 type ViewState =
   | { view: 'home' }
   | { view: 'set-detail'; setId: string }
   | { view: 'edit-set'; setId?: string }
-  | { view: 'study'; setId: string; mode: StudyMode };
+  | { view: 'study'; setId: string; mode: StudyMode }
+  | { view: 'about' };
 
 export default function App() {
   // Current logged in Google user
@@ -59,6 +61,7 @@ export default function App() {
   const [stats, setStats] = useState<UserStats>(() => getStoredStats());
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+  const [hasGoogleToken, setHasGoogleToken] = useState<boolean>(() => !!getCachedGoogleToken());
   const [searchQuery, setSearchQuery] = useState('');
   const [viewState, setViewState] = useState<ViewState>({ view: 'home' });
 
@@ -68,6 +71,13 @@ export default function App() {
   const [isFolderOpen, setIsFolderOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [exportSetTarget, setExportSetTarget] = useState<StudySet | null>(null);
+
+  // Subscribe to auth state changes for Google token
+  useEffect(() => {
+    return subscribeAuth((hasToken) => {
+      setHasGoogleToken(hasToken);
+    });
+  }, []);
 
   // Theme state: default dark mode
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -86,11 +96,11 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Load sets from Google Sheets whenever user is logged in
+  // Load sets from Google Sheets whenever user is logged in AND has an active Google token
   useEffect(() => {
     let isMounted = true;
     async function loadSheetsData() {
-      if (!currentUser) return;
+      if (!currentUser || !hasGoogleToken) return;
       try {
         const sheetsSets = await api.getSets();
         if (isMounted && sheetsSets.length > 0) {
@@ -105,7 +115,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser]);
+  }, [currentUser, hasGoogleToken]);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
 
@@ -114,13 +124,13 @@ export default function App() {
     setIsConnectingGoogle(true);
     setConnectionStatus('Opening Google account selector...');
     try {
-      const { user, accessToken } = await signInWithGoogleOAuth();
+      const { user } = await signInWithGoogleOAuth();
       const userEmail = (user.email || '').trim().toLowerCase();
       const userName = user.displayName || userEmail.split('@')[0];
       const userPicture = user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userEmail)}`;
 
       setConnectionStatus('Checking Google Drive for "cards_library" & "cards_sets"...');
-      await api.initializeGoogleSheetsFiles(accessToken);
+      await api.initializeGoogleSheetsFiles();
 
       const authUser: AuthUser = {
         id: user.uid,
@@ -134,8 +144,8 @@ export default function App() {
       setCurrentUser(authUser);
       localStorage.setItem('cards_auth_user', JSON.stringify(authUser));
 
-      // Refresh sets from Google Sheets using newly obtained accessToken
-      const sheetsSets = await api.getSets(accessToken);
+      // Refresh sets from the Google Sheets
+      const sheetsSets = await api.getSets();
       if (sheetsSets.length > 0) {
         setSets(sheetsSets);
       }
@@ -165,10 +175,10 @@ export default function App() {
   };
 
   // Sign out
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setCurrentUser(null);
     localStorage.removeItem('cards_auth_user');
-    sessionStorage.removeItem('google_workspace_token');
+    await signOutGoogle();
     setViewState({ view: 'home' });
     setIsAuthOpen(false);
   };
@@ -341,13 +351,39 @@ export default function App() {
           setSearchQuery('');
           setViewState({ view: 'home' });
         }}
+        onNavigateAbout={() => setViewState({ view: 'about' })}
+        currentView={viewState.view}
         isDark={isDark}
         onToggleTheme={toggleTheme}
       />
 
+      {/* Session notice banner if Google token is not active in memory */}
+      {currentUser && !hasGoogleToken && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-800 dark:text-amber-300 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span>Google Drive sync paused. Your flashcards are safely available and saved locally on this device.</span>
+          </div>
+          <button
+            onClick={handleDirectSignIn}
+            disabled={isConnectingGoogle}
+            className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
+          >
+            {isConnectingGoogle ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+            <span>Reconnect Google Drive</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
-        {!currentUser ? (
+        {viewState.view === 'about' ? (
+          <AboutView
+            currentUser={currentUser}
+            onNavigateHome={() => setViewState({ view: 'home' })}
+            onOpenAuth={handleDirectSignIn}
+          />
+        ) : !currentUser ? (
           /* SINGLE ACTION: Sign in with Google Account */
           <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-8 my-auto">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
@@ -422,6 +458,19 @@ export default function App() {
                   </>
                 )}
               </button>
+
+              {/* Secondary link to About */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setViewState({ view: 'about' })}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+                >
+                  <Info className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>About project, features and tech stack</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
         ) : (

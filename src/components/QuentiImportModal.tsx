@@ -315,7 +315,7 @@ export const QuentiImportModal: React.FC<QuentiImportModalProps> = ({
 
           {/* Fetched Preview */}
           {fetchedSet && (
-            <div className="space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/80 animate-fade-in">
+            <div className="space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-fade-in">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">

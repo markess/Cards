@@ -190,7 +190,7 @@ export const SetList: React.FC<SetListProps> = ({
                 <div
                   key={studySet.id}
                   onClick={() => onSelectSet(studySet, 'overview')}
-                  className="group relative p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between"
+                  className="group relative p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between"
                 >
                   <div>
                     {/* Header line: folder and card count */}

@@ -9,7 +9,8 @@ import {
   Layers,
   FolderPlus,
   User,
-  ShieldCheck
+  ShieldCheck,
+  Info
 } from 'lucide-react';
 import { AuthUser, UserStats } from '../types';
 
@@ -23,6 +24,8 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onLogout: () => void;
   onNavigateHome: () => void;
+  onNavigateAbout: () => void;
+  currentView?: string;
   isDark: boolean;
   onToggleTheme: () => void;
 }
@@ -37,6 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onLogout,
   onNavigateHome,
+  onNavigateAbout,
+  currentView,
   isDark,
   onToggleTheme,
 }) => {
@@ -66,6 +71,31 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
           </button>
+
+          {/* Quick Nav Links */}
+          <nav className="hidden sm:flex items-center gap-1 pl-2 border-l border-slate-200 dark:border-slate-800">
+            <button
+              onClick={onNavigateHome}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                currentView === 'home'
+                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Study Sets
+            </button>
+            <button
+              onClick={onNavigateAbout}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                currentView === 'about'
+                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Info className="w-3.5 h-3.5 text-indigo-500" />
+              <span>About</span>
+            </button>
+          </nav>
         </div>
 
         {/* Global Search */}
@@ -174,6 +204,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Sign In</span>
             </button>
           )}
+
+          {/* Mobile About Button */}
+          <button
+            onClick={onNavigateAbout}
+            aria-label="About"
+            title="About project, features and tech stack"
+            className={`sm:hidden p-2 rounded-lg transition-colors ${
+              currentView === 'about'
+                ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Info className="w-4 h-4" />
+          </button>
 
           {/* Dark / Light Toggle */}
           <button

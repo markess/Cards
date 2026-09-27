@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gradBack" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="gradFront" x1="16" y1="12" x2="60" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4338ca"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="2" width="64" height="62" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#312e81" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  
+  <!-- Back Card (slightly angled) -->
+  <rect x="8" y="14" width="36" height="42" rx="8" fill="url(#gradBack)" transform="rotate(-12 26 35)" opacity="0.85"/>
+  
+  <!-- Front Card -->
+  <rect x="18" y="10" width="38" height="46" rx="8" fill="url(#gradFront)" filter="url(#shadow)"/>
+  
+  <!-- Front Card Header Line -->
+  <rect x="24" y="18" width="16" height="3" rx="1.5" fill="#ffffff" fill-opacity="0.9"/>
+  
+  <!-- Star / Sparkle Icon in Center -->
+  <path d="M37 25 C37 30 31 33 31 33 C31 33 37 36 37 41 C37 36 43 33 43 33 C43 33 37 30 37 25 Z" fill="#fbbf24"/>
+  
+  <!-- Card Text Placeholder Lines -->
+  <rect x="24" y="44" width="24" height="3" rx="1.5" fill="#e0e7ff" fill-opacity="0.85"/>
+  <rect x="24" y="49" width="15" height="2.5" rx="1.25" fill="#c7d2fe" fill-opacity="0.6"/>
+</svg>

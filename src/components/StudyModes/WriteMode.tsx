@@ -117,7 +117,7 @@ export const WriteMode: React.FC<WriteModeProps> = ({
       </div>
 
       {isFinished ? (
-        <div className="p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl text-center space-y-6 my-auto animate-fade-in">
+        <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center space-y-6 my-auto animate-fade-in">
           <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center">
             <Check className="w-8 h-8" />
           </div>
@@ -148,7 +148,7 @@ export const WriteMode: React.FC<WriteModeProps> = ({
           </div>
         </div>
       ) : currentTerm ? (
-        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl space-y-6 animate-fade-in">
+        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6 animate-fade-in">
           {/* Prompt (Definition) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

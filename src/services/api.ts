@@ -6,48 +6,64 @@ import {
   ensureCardsLibraryFile,
   ensureCardsSetsFile,
 } from './googleSheetsService';
-import { hasActiveGoogleToken, GoogleAuthExpiredError } from './googleAuth';
 import { getStoredSets, saveStoredSets, getStoredFolders, saveStoredFolders, getStoredStats, saveStoredStats } from '../utils/storage';
+import { getCachedGoogleToken } from './googleAuth';
 
 export const api = {
   // Sets
-  async getSets(tokenOverride?: string): Promise<StudySet[]> {
+  async getSets(): Promise<StudySet[]> {
+    if (!getCachedGoogleToken()) {
+      return getStoredSets();
+    }
     try {
-      if (tokenOverride || hasActiveGoogleToken()) {
-        const sheetsSets = await loadSetsFromGoogleSheets(tokenOverride);
-        if (sheetsSets && sheetsSets.length > 0) {
-          saveStoredSets(sheetsSets);
-          return sheetsSets;
-        }
+      const sheetsSets = await loadSetsFromGoogleSheets();
+      if (sheetsSets && sheetsSets.length > 0) {
+        saveStoredSets(sheetsSets);
+        return sheetsSets;
       }
-    } catch (e: any) {
-      if (e instanceof GoogleAuthExpiredError) {
-        console.info('[Google Sheets] Google session expired or inactive, using cached sets.');
-      } else {
-        console.warn('[Google Sheets] Could not load from Google Sheets, using local storage cache:', e);
-      }
+    } catch (e) {
+      console.warn('[Google Sheets] Could not load from Google Sheets, using local storage cache:', e);
     }
     return getStoredSets();
   },
 
-  async saveSet(set: StudySet, tokenOverride?: string): Promise<StudySet> {
-    try {
-      if (tokenOverride || hasActiveGoogleToken()) {
-        await saveSetToGoogleSheets(set, tokenOverride);
+  async saveSet(set: StudySet): Promise<StudySet> {
+    // Always persist locally first for immediate responsiveness
+    const current = getStoredSets();
+    const existingIndex = current.findIndex((s) => s.id === set.id);
+    let updatedSets: StudySet[];
+    if (existingIndex >= 0) {
+      updatedSets = [...current];
+      updatedSets[existingIndex] = set;
+    } else {
+      updatedSets = [set, ...current];
+    }
+    saveStoredSets(updatedSets);
+
+    // Sync to Google Sheets if connected
+    if (getCachedGoogleToken()) {
+      try {
+        await saveSetToGoogleSheets(set);
+      } catch (e) {
+        console.warn('[Google Sheets] Failed saving to Google Sheets (saved locally):', e);
       }
-    } catch (e) {
-      console.warn('[Google Sheets] Failed saving to Google Sheets:', e);
     }
     return set;
   },
 
-  async deleteSet(setId: string, tokenOverride?: string): Promise<void> {
-    try {
-      if (tokenOverride || hasActiveGoogleToken()) {
-        await deleteSetFromGoogleSheets(setId, tokenOverride);
+  async deleteSet(setId: string): Promise<void> {
+    // Delete locally first
+    const current = getStoredSets();
+    const updated = current.filter((s) => s.id !== setId);
+    saveStoredSets(updated);
+
+    // Sync to Google Sheets if connected
+    if (getCachedGoogleToken()) {
+      try {
+        await deleteSetFromGoogleSheets(setId);
+      } catch (e) {
+        console.warn('[Google Sheets] Failed deleting set from Google Sheets (deleted locally):', e);
       }
-    } catch (e) {
-      console.warn('[Google Sheets] Failed deleting set from Google Sheets:', e);
     }
   },
 
@@ -78,9 +94,9 @@ export const api = {
   },
 
   // Check and setup Google Sheets files
-  async initializeGoogleSheetsFiles(tokenOverride?: string): Promise<{ libraryFileId: string; setsFileId: string }> {
-    const libraryFileId = await ensureCardsLibraryFile(tokenOverride);
-    const setsFileId = await ensureCardsSetsFile(tokenOverride);
+  async initializeGoogleSheetsFiles(): Promise<{ libraryFileId: string; setsFileId: string }> {
+    const libraryFileId = await ensureCardsLibraryFile();
+    const setsFileId = await ensureCardsSetsFile();
     return { libraryFileId, setsFileId };
   },
 };

@@ -119,7 +119,7 @@ export const SetDetail: React.FC<SetDetailProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onOpenExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             <Printer className="w-3.5 h-3.5 text-indigo-500" />
             <span>Export & Print</span>
@@ -127,7 +127,7 @@ export const SetDetail: React.FC<SetDetailProps> = ({
 
           <button
             onClick={onEditSet}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             <Edit3 className="w-3.5 h-3.5" />
             <span>Edit Set</span>
@@ -206,7 +206,7 @@ export const SetDetail: React.FC<SetDetailProps> = ({
               <button
                 key={mode.id}
                 onClick={() => onSelectMode(mode.id)}
-                className="group relative p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-lg transition-all duration-200 text-left flex flex-col justify-between overflow-hidden"
+                className="group relative p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-lg transition-all duration-200 text-left flex flex-col justify-between overflow-hidden"
               >
                 {/* Accent top stripe */}
                 <div
@@ -288,7 +288,7 @@ export const SetDetail: React.FC<SetDetailProps> = ({
           {filteredTerms.map((term, idx) => (
             <div
               key={term.id}
-              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 hover:shadow-sm transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:shadow-sm transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
             >
               {/* Term */}
               <div className="flex-1 min-w-[200px] flex items-start gap-3">

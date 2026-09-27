@@ -277,7 +277,7 @@ export const FlashcardsMode: React.FC<FlashcardsModeProps> = ({
 
       {/* Settings popup panel */}
       {showSettings && (
-        <div className="mb-4 p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl space-y-3 text-xs animate-fade-in">
+        <div className="mb-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-3 text-xs animate-fade-in">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2">
             <span className="font-bold text-slate-900 dark:text-white">Flashcard Settings</span>
             <button
@@ -329,10 +329,10 @@ export const FlashcardsMode: React.FC<FlashcardsModeProps> = ({
           }`}
         >
           {/* Card Front */}
-          <div className="absolute inset-0 backface-hidden rounded-3xl p-8 flex flex-col justify-between bg-white dark:bg-slate-800 shadow-md">
+          <div className="absolute inset-0 backface-hidden rounded-3xl p-8 flex flex-col justify-between bg-white dark:bg-slate-900 shadow-md border border-slate-200/80 dark:border-slate-800">
             {/* Top front badges */}
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="uppercase tracking-wider font-semibold text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
+              <span className="uppercase tracking-wider font-semibold text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                 {frontLabel}
               </span>
               <div className="flex items-center gap-2">
@@ -343,7 +343,7 @@ export const FlashcardsMode: React.FC<FlashcardsModeProps> = ({
                     handleSpeak(frontText);
                   }}
                   title="Pronounce text"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <Volume2 className="w-4 h-4" />
                 </button>
@@ -354,7 +354,7 @@ export const FlashcardsMode: React.FC<FlashcardsModeProps> = ({
                     handleToggleStar();
                   }}
                   title="Star this card"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <Star className={`w-4 h-4 ${currentTerm.starred ? 'fill-amber-500 text-amber-500' : ''}`} />
                 </button>
@@ -371,12 +371,12 @@ export const FlashcardsMode: React.FC<FlashcardsModeProps> = ({
             {/* Bottom prompt hint */}
             <div className="text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
               <RotateCw className="w-3.5 h-3.5 animate-spin-slow" />
-              <span>Click or press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px]">Space</kbd> to flip</span>
+              <span>Click or press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px]">Space</kbd> to flip</span>
             </div>
           </div>
 
           {/* Card Back */}
-          <div className="absolute inset-0 backface-hidden rotate-y-180 rounded-3xl p-8 flex flex-col justify-between bg-gradient-to-br from-indigo-50/50 to-white dark:from-slate-800 dark:to-slate-900 shadow-md border-indigo-100 dark:border-indigo-900/30">
+          <div className="absolute inset-0 backface-hidden rotate-y-180 rounded-3xl p-8 flex flex-col justify-between bg-gradient-to-br from-indigo-50/50 to-white dark:from-slate-900 dark:to-slate-950 shadow-md border border-indigo-100 dark:border-slate-800">
             {/* Top back badges */}
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span className="uppercase tracking-wider font-semibold text-[10px] px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
@@ -444,7 +444,7 @@ export const FlashcardsMode: React.FC<FlashcardsModeProps> = ({
             <button
               onClick={handlePrev}
               title="Previous card"
-              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm transition-all active:scale-95"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm transition-all active:scale-95"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>

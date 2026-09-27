@@ -248,7 +248,7 @@ export const MatchMode: React.FC<MatchModeProps> = ({
 
       {/* Game Over Modal / Victory Card */}
       {isGameOver ? (
-        <div className="p-8 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl max-w-lg mx-auto w-full text-center space-y-6 animate-fade-in my-auto">
+        <div className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg mx-auto w-full text-center space-y-6 animate-fade-in my-auto">
           <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
             <Trophy className="w-10 h-10" />
           </div>
@@ -353,7 +353,7 @@ export const MatchMode: React.FC<MatchModeProps> = ({
             const isWrong = wrongPair && wrongPair.includes(tile.tileId);
 
             let borderAndBg =
-              'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:shadow-md';
+              'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-400 hover:shadow-md';
 
             if (isSelected) {
               borderAndBg =

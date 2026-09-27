@@ -233,7 +233,7 @@ export const TestMode: React.FC<TestModeProps> = ({
 
       {/* Screen 1: Test Setup Configuration */}
       {!isTestStarted ? (
-        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl space-y-6 my-auto">
+        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6 my-auto">
           <div>
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">
               Set Up Your Practice Test
@@ -347,7 +347,7 @@ export const TestMode: React.FC<TestModeProps> = ({
         /* Screen 2: Test Results & Score Report */
         <div className="space-y-6 animate-fade-in">
           {/* Main Score Hero */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl text-center space-y-4">
+          <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center space-y-4">
             <div className="w-16 h-16 mx-auto rounded-full bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 flex items-center justify-center">
               <Award className="w-8 h-8" />
             </div>
@@ -389,7 +389,7 @@ export const TestMode: React.FC<TestModeProps> = ({
             {scoreReport.gradedQuestions.map((q, idx) => (
               <div
                 key={q.id}
-                className={`p-4 rounded-xl border space-y-2 bg-white dark:bg-slate-800 ${
+                className={`p-4 rounded-xl border space-y-2 bg-white dark:bg-slate-900 ${
                   q.isCorrect
                     ? 'border-emerald-200 dark:border-emerald-800/60'
                     : 'border-red-200 dark:border-red-800/60'
@@ -457,7 +457,7 @@ export const TestMode: React.FC<TestModeProps> = ({
             {questions.map((q, idx) => (
               <div
                 key={q.id}
-                className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4"
+                className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4"
               >
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span className="font-semibold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">

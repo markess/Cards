@@ -52,13 +52,19 @@ function shuffle<T>(array: T[]): T[] {
   return result;
 }
 
+export interface TermProgress {
+  correctCount: number;
+  requiredCorrect: number; // 2 if flashcard ("Flip to verify definition"), 1 if any other mode
+  isMastered: boolean;
+}
+
 export const LearnMode: React.FC<LearnModeProps> = ({
   studySet,
   onExit,
   onRecordStudy,
 }) => {
-  // Mastery tracking: termId -> score (0 = unlearned, 1 = familiar, 2 = mastered)
-  const [mastery, setMastery] = useState<Record<string, number>>({});
+  // Mastery tracking: termId -> TermProgress
+  const [progress, setProgress] = useState<Record<string, TermProgress>>({});
   const [roundNumber, setRoundNumber] = useState<number>(1);
   const [roundQuestions, setRoundQuestions] = useState<LearnQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -73,8 +79,8 @@ export const LearnMode: React.FC<LearnModeProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Helper to build questions for a set of terms with completely randomized modes
-  const buildQuestionsForTerms = (terms: Term[], currentMastery: Record<string, number>): LearnQuestion[] => {
+  // Helper to build questions for a set of terms with randomized modes
+  const buildQuestionsForTerms = (terms: Term[], currentProgress: Record<string, TermProgress>): LearnQuestion[] => {
     // All available learning methods
     const allTypes: QuestionType[] = ['mc-definition', 'mc-term', 'true-false', 'flashcard', 'written'];
 
@@ -165,9 +171,9 @@ export const LearnMode: React.FC<LearnModeProps> = ({
   };
 
   // Start new round
-  const startRound = (newRoundNum: number, currentMastery: Record<string, number>) => {
-    // Find terms not yet mastered (< 2)
-    const unmastered = studySet.terms.filter((t) => (currentMastery[t.id] || 0) < 2);
+  const startRound = (newRoundNum: number, currentProgress: Record<string, TermProgress>) => {
+    // Only terms that are NOT yet mastered are included
+    const unmastered = studySet.terms.filter((t) => !currentProgress[t.id]?.isMastered);
 
     if (unmastered.length === 0) {
       setRoundCompleted(true);
@@ -175,12 +181,12 @@ export const LearnMode: React.FC<LearnModeProps> = ({
       return;
     }
 
-    // Words in Learn appear in RANDOM order (shuffled)
+    // Terms in Learn appear in RANDOM order (shuffled)
     const shuffledUnmastered = shuffle(unmastered);
 
     // Batch of up to 6 terms for this round
     const batch = shuffledUnmastered.slice(0, 6);
-    const questions = buildQuestionsForTerms(batch, currentMastery);
+    const questions = buildQuestionsForTerms(batch, currentProgress);
 
     setRoundQuestions(questions);
     setRoundNumber(newRoundNum);
@@ -195,7 +201,7 @@ export const LearnMode: React.FC<LearnModeProps> = ({
 
   // Initialize once per studySet id
   useEffect(() => {
-    setMastery({});
+    setProgress({});
     startRound(1, {});
   }, [studySet.id]);
 
@@ -223,20 +229,70 @@ export const LearnMode: React.FC<LearnModeProps> = ({
     setSelectedOption(userAns);
     setIsAnswerSubmitted(true);
 
+    const termId = currentQ.term.id;
+    const isFlip = currentQ.type === 'flashcard';
+
+    let defaultFeedback = feedback;
+    if (!defaultFeedback) {
+      if (isCorrect) {
+        if (isFlip) {
+          defaultFeedback = 'Correct! 1 of 2 verifications recorded for Flip mode.';
+        } else {
+          defaultFeedback = 'Correct! This term is now mastered and completed for all 5 rounds.';
+        }
+      } else {
+        defaultFeedback = `Incorrect. Progress for this term has been reset. The correct answer is: ${currentQ.correctAnswer}`;
+      }
+    }
+
     setGradingResult({
       isCorrect,
       isClose: false,
       score: isCorrect ? 1.0 : 0.0,
-      feedback: feedback || (isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${currentQ.correctAnswer}`),
+      feedback: defaultFeedback,
     });
 
-    // Update mastery:
-    // If correct: +1 up to 2
-    // If incorrect: reset to 0
-    setMastery((prev) => {
-      const currentScore = prev[currentQ.term.id] || 0;
-      const nextScore = isCorrect ? Math.min(2, currentScore + 1) : 0;
-      return { ...prev, [currentQ.term.id]: nextScore };
+    // Update progress:
+    // If correct in Flip mode ("Flip to verify definition"): requires 2 correct answers across all rounds
+    // If correct in any other mode: requires ONLY 1 correct answer across all rounds
+    // If incorrect in any mode: counter is RESET to 0!
+    setProgress((prev) => {
+      const existing = prev[termId] || { correctCount: 0, requiredCorrect: isFlip ? 2 : 1, isMastered: false };
+
+      if (isCorrect) {
+        if (isFlip) {
+          const nextCount = existing.correctCount + 1;
+          const isMastered = nextCount >= 2;
+          return {
+            ...prev,
+            [termId]: {
+              correctCount: nextCount,
+              requiredCorrect: 2,
+              isMastered,
+            },
+          };
+        } else {
+          // 1 correct answer in any test/written/choice mode fulfills mastery!
+          return {
+            ...prev,
+            [termId]: {
+              correctCount: existing.correctCount + 1,
+              requiredCorrect: 1,
+              isMastered: true,
+            },
+          };
+        }
+      } else {
+        // Incorrect answer: counter resets to 0!
+        return {
+          ...prev,
+          [termId]: {
+            correctCount: 0,
+            requiredCorrect: 1,
+            isMastered: false,
+          },
+        };
+      }
     });
 
     onRecordStudy(1);
@@ -266,7 +322,9 @@ export const LearnMode: React.FC<LearnModeProps> = ({
     submitAnswer(
       known ? 'Know it' : 'Still learning',
       known,
-      known ? 'Great! Marked as familiar.' : 'Keep practicing this term!'
+      known
+        ? 'Great! 1 correct verification recorded (needs 2 to master in Flip mode).'
+        : 'Keep practicing! Progress for this card has been reset.'
     );
   };
 
@@ -285,10 +343,21 @@ export const LearnMode: React.FC<LearnModeProps> = ({
     setGradingResult((prev) =>
       prev ? { ...prev, isCorrect: true, feedback: 'Overridden: Marked as correct.' } : null
     );
-    setMastery((prev) => ({
-      ...prev,
-      [currentQ.term.id]: Math.min(2, (prev[currentQ.term.id] || 0) + 1),
-    }));
+    const termId = currentQ.term.id;
+    const isFlip = currentQ.type === 'flashcard';
+    setProgress((prev) => {
+      const existing = prev[termId] || { correctCount: 0, requiredCorrect: isFlip ? 2 : 1, isMastered: false };
+      const nextCount = existing.correctCount + 1;
+      const isMastered = isFlip ? nextCount >= 2 : true;
+      return {
+        ...prev,
+        [termId]: {
+          correctCount: nextCount,
+          requiredCorrect: isFlip ? 2 : 1,
+          isMastered,
+        },
+      };
+    });
   };
 
   // Advance to next question in this round, or finish round
@@ -388,8 +457,10 @@ export const LearnMode: React.FC<LearnModeProps> = ({
   }, [isAnswerSubmitted, currentQ, currentIndex, isCardFlipped]);
 
   // Overall Mastery calculations
-  const totalMastered = Object.values(mastery).filter((v) => v >= 2).length;
-  const totalFamiliar = Object.values(mastery).filter((v) => v === 1).length;
+  const totalMastered = studySet.terms.filter((t) => progress[t.id]?.isMastered).length;
+  const totalFamiliar = studySet.terms.filter(
+    (t) => !progress[t.id]?.isMastered && (progress[t.id]?.correctCount || 0) > 0
+  ).length;
   const totalNotStudied = Math.max(0, studySet.terms.length - (totalMastered + totalFamiliar));
   const isSetCompletelyMastered = totalMastered === studySet.terms.length && studySet.terms.length > 0;
 
@@ -400,9 +471,10 @@ export const LearnMode: React.FC<LearnModeProps> = ({
   const roundProgressPercent = Math.min(100, Math.round((currentStep / Math.max(1, roundQuestions.length)) * 100));
 
   // Overall set mastery score
-  const totalPoints = totalMastered * 2 + totalFamiliar * 1;
-  const maxPossiblePoints = Math.max(1, studySet.terms.length * 2);
-  const overallMasteryPercent = Math.min(100, Math.round((totalPoints / maxPossiblePoints) * 100));
+  const overallMasteryPercent = Math.min(
+    100,
+    Math.round((totalMastered / Math.max(1, studySet.terms.length)) * 100)
+  );
 
   return (
     <div className="flex flex-col flex-1 max-w-3xl mx-auto w-full px-4 py-4 space-y-4">
@@ -428,11 +500,12 @@ export const LearnMode: React.FC<LearnModeProps> = ({
           <span className="w-5 h-5 rounded-full bg-white text-indigo-700 flex items-center justify-center font-black text-[11px]">
             {roundNumber}
           </span>
+          <span className="text-indigo-200 text-[10px]">of 5</span>
         </div>
       </div>
 
       {/* DUAL REAL-TIME PROGRESS BARS */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
         {/* 1. Current Round Step Progress Bar */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-semibold">
@@ -491,7 +564,7 @@ export const LearnMode: React.FC<LearnModeProps> = ({
 
       {/* VIEW: Round / Stage Completed Screen */}
       {roundCompleted ? (
-        <div className="p-8 rounded-3xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 shadow-xl text-center space-y-6 animate-fade-in my-auto">
+        <div className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center space-y-6 animate-fade-in my-auto">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
             <Award className="w-8 h-8" />
           </div>
@@ -503,12 +576,12 @@ export const LearnMode: React.FC<LearnModeProps> = ({
             <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
               {isSetCompletelyMastered
                 ? 'Study Set 100% Mastered!'
-                : `Round ${roundNumber} Complete!`}
+                : `Round ${roundNumber} of 5 Complete!`}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto leading-relaxed">
               {isSetCompletelyMastered
-                ? 'Congratulations! You answered every flashcard correctly twice.'
-                : `Great progress! Terms answered correctly have moved closer to mastery. Continue to Round ${roundNumber + 1} to keep advancing.`}
+                ? 'Congratulations! All terms have been mastered across all 5 rounds.'
+                : `Great progress! Terms answered correctly are completed across all 5 rounds. Unmastered terms will advance to Round ${roundNumber + 1}.`}
             </p>
           </div>
 
@@ -546,16 +619,16 @@ export const LearnMode: React.FC<LearnModeProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             {!isSetCompletelyMastered ? (
               <button
-                onClick={() => startRound(roundNumber + 1, mastery)}
+                onClick={() => startRound(roundNumber + 1, progress)}
                 className="w-full sm:w-auto px-7 py-3 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                <span>Continue to Round {roundNumber + 1}</span>
+                <span>Continue to Round {roundNumber + 1} {roundNumber < 5 ? 'of 5' : ''}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={() => {
-                  setMastery({});
+                  setProgress({});
                   startRound(1, {});
                 }}
                 className="w-full sm:w-auto px-7 py-3 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
@@ -575,13 +648,22 @@ export const LearnMode: React.FC<LearnModeProps> = ({
         </div>
       ) : currentQ ? (
         /* VIEW: Active Question Card */
-        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6 animate-fade-in">
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6 animate-fade-in">
           {/* Prompt Header */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400">
-                {currentQ.subPrompt}
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400">
+                  {currentQ.subPrompt}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  currentQ.type === 'flashcard'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                    : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                }`}>
+                  {currentQ.type === 'flashcard' ? '2 correct needed' : '1 correct needed'}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
                   <Keyboard className="w-3 h-3" />

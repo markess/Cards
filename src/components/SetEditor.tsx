@@ -176,7 +176,7 @@ export const SetEditor: React.FC<SetEditorProps> = ({
         </div>
 
         {/* Set Metadata Fields */}
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
               Title <span className="text-red-500">*</span>
@@ -307,7 +307,7 @@ export const SetEditor: React.FC<SetEditorProps> = ({
           {terms.map((term, index) => (
             <div
               key={term.id}
-              className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3"
+              className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
             >
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span className="font-bold text-slate-500">#{index + 1}</span>
