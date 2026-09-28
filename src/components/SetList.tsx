@@ -60,7 +60,7 @@ export const SetList: React.FC<SetListProps> = ({
   const getFolder = (folderId?: string) => folders.find((f) => f.id === folderId);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Compact Header */}
       <div className="relative overflow-hidden rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white shadow-md border border-indigo-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -181,15 +181,7 @@ export const SetList: React.FC<SetListProps> = ({
             </div>
           </div>
         ) : (
-          <div
-            className={`grid gap-5 w-full ${
-              filteredSets.length === 1
-                ? 'grid-cols-1'
-                : filteredSets.length === 2
-                ? 'grid-cols-1 md:grid-cols-2'
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}
-          >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full">
             {filteredSets.map((studySet) => {
               const folder = getFolder(studySet.folderId);
               const starredCount = studySet.terms.filter((t) => t.starred).length;
@@ -198,7 +190,7 @@ export const SetList: React.FC<SetListProps> = ({
                 <div
                   key={studySet.id}
                   onClick={() => onSelectSet(studySet, 'overview')}
-                  className="group relative p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between w-full"
+                  className="group relative p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between w-full min-w-0"
                 >
                   <div className="space-y-2">
                     {/* Header line: folder and card count */}
