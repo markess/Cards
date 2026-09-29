@@ -190,7 +190,7 @@ export const SetList: React.FC<SetListProps> = ({
                 <div
                   key={studySet.id}
                   onClick={() => onSelectSet(studySet, 'overview')}
-                  className="group relative p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between w-full min-w-0"
+                  className="group relative p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-500 dark:hover:border-indigo-500/80 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between w-full min-w-0 overflow-hidden"
                 >
                   <div className="space-y-2">
                     {/* Header line: folder and card count */}
@@ -247,8 +247,8 @@ export const SetList: React.FC<SetListProps> = ({
                   </div>
 
                   {/* Quick study mode launchers */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
+                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -256,10 +256,10 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'flashcards');
                         }}
                         title="Start Flashcards"
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0"
                       >
                         <Layers className="w-4 h-4 text-indigo-500" />
-                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Cards</span>
+                        <span className="sr-only">Cards</span>
                       </button>
 
                       <button
@@ -269,10 +269,10 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'learn');
                         }}
                         title="Start Cortex Learn"
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0"
                       >
                         <Sparkles className="w-4 h-4 text-amber-500" />
-                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Learn</span>
+                        <span className="sr-only">Learn</span>
                       </button>
 
                       <button
@@ -282,10 +282,10 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'match');
                         }}
                         title="Start Match Race"
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0"
                       >
                         <Gamepad2 className="w-4 h-4 text-emerald-500" />
-                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Match</span>
+                        <span className="sr-only">Match</span>
                       </button>
 
                       <button
@@ -295,16 +295,16 @@ export const SetList: React.FC<SetListProps> = ({
                           onSelectSet(studySet, 'test');
                         }}
                         title="Practice Test"
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0"
                       >
                         <FileCheck2 className="w-4 h-4 text-purple-500" />
-                        <span className={filteredSets.length === 1 ? 'inline' : 'hidden sm:inline'}>Test</span>
+                        <span className="sr-only">Test</span>
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-1 transition-transform">
-                      <span>Study</span>
-                      <Play className="w-3.5 h-3.5 fill-indigo-600 dark:fill-indigo-400" />
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:text-indigo-500 transition-colors">
+                      <span className="shrink-0 whitespace-nowrap">Study</span>
+                      <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
                     </div>
                   </div>
                 </div>

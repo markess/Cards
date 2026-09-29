@@ -31,16 +31,29 @@ export const FolderModal: React.FC<FolderModalProps> = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
 
+    // Check if a folder with the same name already exists (case-insensitive)
+    const exists = folders.some(
+      (f) => f.name.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (exists) {
+      setErrorMessage(`Папка с названием "${trimmed}" уже существует.`);
+      return;
+    }
+
+    setErrorMessage(null);
     const newFolder: FolderType = {
       id: `folder-${Date.now()}`,
-      name: name.trim(),
+      name: trimmed,
       description: description.trim(),
       color: selectedColor,
       createdAt: Date.now(),
@@ -90,10 +103,22 @@ export const FolderModal: React.FC<FolderModalProps> = ({
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="e.g. Psychology 101, MCAT Prep"
-                className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className={`w-full px-3.5 py-2 text-sm rounded-lg border bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:outline-none transition-colors ${
+                  errorMessage
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-slate-300 dark:border-slate-600 focus:ring-indigo-500'
+                }`}
               />
+              {errorMessage && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">
+                  {errorMessage}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
