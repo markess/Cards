@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Download, Sparkles, Check, ArrowRight, Loader2, Link2, ExternalLink, AlertCircle, Volume2 } from 'lucide-react';
 import { Folder, StudySet } from '../types';
 import { AVAILABLE_VOICES, getVoiceConfigFromTags, speakText } from '../utils/tts';
+import { fetchQuentiStudySet } from '../utils/quenti';
 
 interface QuentiImportModalProps {
   isOpen: boolean;
@@ -74,75 +75,20 @@ export const QuentiImportModal: React.FC<QuentiImportModalProps> = ({
       }
     }
 
-    // Client-side direct fetch from Quenti public tRPC endpoint
+    // Fetch from Quenti public tRPC endpoint via proxy or fallbacks
     try {
-      let setId = input;
-      const urlMatch = input.match(/(?:app\.quenti\.io\/(?:sets\/)?|quenti\.io\/(?:sets\/)?)([a-zA-Z0-9_-]{10,40})/);
-      if (urlMatch && urlMatch[1]) {
-        setId = urlMatch[1];
-      } else {
-        setId = setId.split('?')[0].replace(/\/+$/, '').split('/').pop() || setId;
-      }
-
-      const inputObj = {
-        '0': {
-          json: {
-            studySetId: setId,
-            withDistractors: false,
-            withCollab: false,
-          },
-        },
-      };
-
-      const trpcUrl = `https://app.quenti.io/api/trpc/studySets.getPublic?batch=1&input=${encodeURIComponent(
-        JSON.stringify(inputObj)
-      )}`;
-
-      const res = await fetch(trpcUrl, {
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Quenti returned status ${res.status}. The study set may be private or not exist.`);
-      }
-
-      const json = await res.json();
-      const setPayload = json?.[0]?.result?.data?.json;
-
-      if (!setPayload) {
-        throw new Error('Could not parse Quenti study set format.');
-      }
-
-      const terms = (setPayload.terms || []).map((t: any, idx: number) => ({
-        id: `term-q-${Date.now()}-${idx}`,
-        term: t.word || t.term || `Term ${idx + 1}`,
-        definition: t.definition || '',
-        starred: false,
-      }));
-
-      const formattedSet: StudySet = {
-        id: `set-quenti-${setPayload.id || Date.now()}`,
-        title: setPayload.title || 'Imported Quenti Set',
-        description: setPayload.description || `Imported from Quenti (${terms.length} cards)`,
-        author: setPayload.user?.username || 'quenti',
-        tags: Array.isArray(setPayload.tags) && setPayload.tags.length > 0 ? setPayload.tags : ['Quenti', 'Imported'],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        terms,
-      };
-
+      const formattedSet = await fetchQuentiStudySet(input);
       setFetchedSet(formattedSet);
-      if (formattedSet.tags) {
-        setSelectedVoiceTag(getVoiceConfigFromTags(formattedSet.tags).tag);
+
+      // Auto-detect voice if tags suggest one
+      if (formattedSet.tags && formattedSet.tags.length > 0) {
+        const detected = getVoiceConfigFromTags(formattedSet.tags);
+        setSelectedVoiceTag(detected.tag);
       }
     } catch (err: any) {
-      console.warn('Direct Quenti fetch issue:', err);
+      console.warn('Quenti fetch issue:', err);
       setError(
-        err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')
-          ? 'Browser network restriction prevented direct URL fetch. You can paste the set JSON or use the Bulk Import modal to paste cards directly.'
-          : err.message || 'Error communicating with Quenti API.'
+        err.message || 'Error communicating with Quenti API. Make sure the set is public or paste the cards manually.'
       );
     } finally {
       setIsLoading(false);
