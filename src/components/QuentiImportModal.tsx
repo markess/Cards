@@ -75,6 +75,46 @@ export const QuentiImportModal: React.FC<QuentiImportModalProps> = ({
       }
     }
 
+    // Check if user pasted multi-line cards or tab-separated text directly
+    if (input.includes('\n') || (input.includes('\t') && !input.startsWith('http'))) {
+      const lines = input.split('\n').map((l) => l.trim()).filter(Boolean);
+      const terms: any[] = [];
+      lines.forEach((line, idx) => {
+        let parts = line.split('\t');
+        if (parts.length < 2) {
+          if (line.includes(' - ')) parts = line.split(' - ');
+          else if (line.includes(': ')) parts = line.split(': ');
+          else if (line.includes(',')) parts = line.split(',');
+          else parts = [line, ''];
+        }
+        const term = parts[0]?.trim();
+        const definition = parts.slice(1).join('\t').trim();
+        if (term || definition) {
+          terms.push({
+            id: `term-text-${Date.now()}-${idx}`,
+            term: term || `Card ${idx + 1}`,
+            definition: definition || '',
+            starred: false,
+          });
+        }
+      });
+      if (terms.length > 0) {
+        const formattedSet: StudySet = {
+          id: `set-quenti-${Date.now()}`,
+          title: 'Imported Cards List',
+          description: `Imported ${terms.length} cards`,
+          author: 'user',
+          tags: ['Quenti', 'Imported'],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          terms,
+        };
+        setFetchedSet(formattedSet);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     // Fetch from Quenti public tRPC endpoint via proxy or fallbacks
     try {
       const formattedSet = await fetchQuentiStudySet(input);
@@ -87,8 +127,11 @@ export const QuentiImportModal: React.FC<QuentiImportModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Quenti fetch issue:', err);
+      const isCors = err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('CORS');
       setError(
-        err.message || 'Error communicating with Quenti API. Make sure the set is public or paste the cards manually.'
+        isCors
+          ? 'Браузер заблокировал прямой сетевой запрос CORS. Если вы открыли приложение на статическом хостинге, обновите страницу (Ctrl+Shift+R) или скопируйте карточки из Quenti и вставьте их сюда.'
+          : err.message || 'Ошибка связи с API Quenti. Убедитесь, что сет публичный, или вставьте карточки вручную.'
       );
     } finally {
       setIsLoading(false);
@@ -251,11 +294,29 @@ export const QuentiImportModal: React.FC<QuentiImportModalProps> = ({
             </div>
           </div>
 
-          {/* Error message */}
+          {/* Error message with fallback instructions */}
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 animate-fade-in">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 space-y-2.5 text-xs text-red-700 dark:text-red-300 animate-fade-in">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+              {quentiUrl.trim() && (
+                <div className="pt-2 border-t border-red-200/80 dark:border-red-900/60 flex flex-wrap items-center justify-between gap-2">
+                  <a
+                    href={quentiUrl.startsWith('http') ? quentiUrl : `https://app.quenti.io/${quentiUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Открыть сет в Quenti</span>
+                  </a>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Можно скопировать карточки или JSON и вставить прямо в поле ввода
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

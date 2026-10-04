@@ -32,12 +32,10 @@ export async function fetchQuentiStudySet(urlOrId: string): Promise<StudySet> {
   const directEndpoint = `https://app.quenti.io/api/trpc/studySets.getPublic?${queryString}`;
   const localProxyEndpoint = `/api/quenti-proxy/api/trpc/studySets.getPublic?${queryString}`;
 
-  // Candidate fetch URLs: local proxy first (avoids CORS in browser), then direct, then CORS proxies
+  // Candidate fetch URLs: local proxy first (avoids CORS in browser dev/preview), then direct
   const candidateUrls = [
     localProxyEndpoint,
     directEndpoint,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(directEndpoint)}`,
-    `https://corsproxy.io/?url=${encodeURIComponent(directEndpoint)}`,
   ];
 
   let setPayload: any = null;
