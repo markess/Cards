@@ -621,12 +621,14 @@ export default function App() {
       </main>
 
       {/* Global Modals */}
-      <QuentiImportModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        folders={folders}
-        onImportSet={handleImportSet}
-      />
+      {isImportOpen && (
+        <QuentiImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          folders={folders}
+          onImportSet={handleImportSet}
+        />
+      )}
 
       {exportSetTarget && (
         <ExportModal
