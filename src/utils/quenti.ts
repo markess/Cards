@@ -32,7 +32,9 @@ export async function fetchQuentiStudySet(urlOrId: string): Promise<StudySet> {
   const directEndpoint = `https://app.quenti.io/api/trpc/studySets.getPublic?${queryString}`;
   const localProxyEndpoint = `/api/quenti-proxy/api/trpc/studySets.getPublic?${queryString}`;
 
-  // Candidate fetch URLs: local proxy first (avoids CORS in browser dev/preview), then direct
+  // Candidate fetch URLs:
+  // 1. localProxyEndpoint: Same-origin proxy (avoids CORS entirely in dev / preview / container)
+  // 2. directEndpoint: Direct GET request structured strictly as a CORS simple request (no custom headers, avoiding preflight OPTIONS)
   const candidateUrls = [
     localProxyEndpoint,
     directEndpoint,
@@ -43,7 +45,13 @@ export async function fetchQuentiStudySet(urlOrId: string): Promise<StudySet> {
 
   for (const fetchUrl of candidateUrls) {
     try {
-      const res = await fetch(fetchUrl);
+      // Formatted as a CORS-safelisted Simple Request:
+      // - Method is GET
+      // - No custom request headers (no Authorization, no X-*, no non-safelisted headers)
+      // This guarantees the browser will NOT trigger an HTTP OPTIONS preflight request.
+      const res = await fetch(fetchUrl, {
+        method: 'GET',
+      });
       if (!res.ok) continue;
 
       const json = await res.json();
