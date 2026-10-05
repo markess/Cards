@@ -11,7 +11,8 @@ import {
   Volume2, 
   FileText, 
   ArrowUpDown,
-  Sparkles
+  Sparkles,
+  Settings
 } from 'lucide-react';
 import { Folder, StudySet, Term } from '../types';
 import { AVAILABLE_VOICES, getVoiceConfigFromTags, speakText } from '../utils/tts';
@@ -41,6 +42,12 @@ export const QuentiImportModal: React.FC<QuentiImportModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedSet, setFetchedSet] = useState<StudySet | null>(null);
+  const [proxyUrl, setProxyUrl] = useState(() =>
+    typeof window !== 'undefined'
+      ? localStorage.getItem('cards_cors_proxy_url') || 'https://quenti-cors-proxy.maxim1nts.workers.dev'
+      : 'https://quenti-cors-proxy.maxim1nts.workers.dev'
+  );
+  const [isProxyConfigOpen, setIsProxyConfigOpen] = useState(false);
 
   // Live parsed terms from text input
   const parsedFromText = useMemo<{ terms: Term[]; detectedTitle?: string }>(() => {
@@ -456,6 +463,60 @@ diagnostiquer\tto diagnose`);
               </div>
             </div>
           )}
+
+          {/* Cloudflare Worker / CORS Proxy Configuration */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setIsProxyConfigOpen(!isProxyConfigOpen)}
+              className="text-[11px] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 transition-colors font-medium"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Cloudflare Worker / CORS Proxy Settings</span>
+              {proxyUrl && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
+                  Active
+                </span>
+              )}
+            </button>
+
+            {isProxyConfigOpen && (
+              <div className="mt-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                    Cloudflare Worker Proxy URL
+                  </span>
+                  {proxyUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProxyUrl('');
+                        localStorage.removeItem('cards_cors_proxy_url');
+                      }}
+                      className="text-[11px] text-red-500 hover:underline"
+                    >
+                      Clear proxy
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={proxyUrl}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    setProxyUrl(val);
+                    if (val) localStorage.setItem('cards_cors_proxy_url', val);
+                    else localStorage.removeItem('cards_cors_proxy_url');
+                  }}
+                  placeholder="https://your-worker-name.your-account.workers.dev"
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Enter your Cloudflare Worker URL to automatically bypass CORS on GitHub Pages. Leave empty to use default direct fetch.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Folder and Voice Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-200 dark:border-slate-800">

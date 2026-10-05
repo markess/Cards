@@ -32,13 +32,32 @@ export async function fetchQuentiStudySet(urlOrId: string): Promise<StudySet> {
   const directEndpoint = `https://app.quenti.io/api/trpc/studySets.getPublic?${queryString}`;
   const localProxyEndpoint = `/api/quenti-proxy/api/trpc/studySets.getPublic?${queryString}`;
 
-  // Candidate fetch URLs:
-  // 1. localProxyEndpoint: Same-origin proxy (avoids CORS entirely in dev / preview / container)
-  // 2. directEndpoint: Direct GET request structured strictly as a CORS simple request (no custom headers, avoiding preflight OPTIONS)
-  const candidateUrls = [
-    localProxyEndpoint,
-    directEndpoint,
-  ];
+  const DEFAULT_WORKER_PROXY = 'https://quenti-cors-proxy.maxim1nts.workers.dev';
+
+  // Custom proxy (e.g. Cloudflare Worker) if configured via localStorage, VITE_CORS_PROXY_URL, or default
+  const customProxy =
+    (typeof window !== 'undefined' && localStorage.getItem('cards_cors_proxy_url')) ||
+    (import.meta as any).env?.VITE_CORS_PROXY_URL ||
+    DEFAULT_WORKER_PROXY;
+
+  const candidateUrls: string[] = [];
+
+  // Local proxy first (for dev/preview)
+  candidateUrls.push(localProxyEndpoint);
+
+  // Cloudflare Worker proxy (for GitHub Pages / production)
+  if (customProxy) {
+    const trimmed = customProxy.trim();
+    const proxyUrl = trimmed.includes('?url=')
+      ? `${trimmed}${encodeURIComponent(directEndpoint)}`
+      : trimmed.endsWith('/') || trimmed.endsWith('?')
+      ? `${trimmed}url=${encodeURIComponent(directEndpoint)}`
+      : `${trimmed}?url=${encodeURIComponent(directEndpoint)}`;
+    candidateUrls.push(proxyUrl);
+  }
+
+  // Direct fetch fallback
+  candidateUrls.push(directEndpoint);
 
   let setPayload: any = null;
   let lastError: Error | null = null;
