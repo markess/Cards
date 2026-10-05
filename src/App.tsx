@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { AuthUser, Folder, StudyMode, StudySet, UserStats } from './types';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { AuthUser, Folder, StudyMode, StudySet, Term, UserStats } from './types';
 import {
   getStoredFolders,
   getStoredSets,
@@ -26,6 +26,8 @@ import { QuentiImportModal } from './components/QuentiImportModal';
 import { ExportModal } from './components/ExportModal';
 import { FolderModal } from './components/FolderModal';
 import { AuthModal } from './components/AuthModal';
+import { TelegramBotModal } from './components/TelegramBotModal';
+import { telegramBotManager } from './services/telegramBotService';
 import { FlashcardsMode } from './components/StudyModes/FlashcardsMode';
 import { LearnMode } from './components/StudyModes/LearnMode';
 import { MatchMode } from './components/StudyModes/MatchMode';
@@ -70,7 +72,22 @@ export default function App() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isFolderOpen, setIsFolderOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isTelegramOpen, setIsTelegramOpen] = useState(false);
   const [exportSetTarget, setExportSetTarget] = useState<StudySet | null>(null);
+
+  // Telegram Bot State & Owner Access Control
+  const [telegramToken, setTelegramToken] = useState<string>(() => localStorage.getItem('cards_telegram_token') || '');
+  const [telegramUsername, setTelegramUsername] = useState<string>(() => localStorage.getItem('cards_telegram_username') || '');
+  const [telegramOwnerId, setTelegramOwnerId] = useState<string>(() => localStorage.getItem('cards_telegram_owner_id') || '');
+  const [telegramOwnerUsername, setTelegramOwnerUsername] = useState<string>(() => localStorage.getItem('cards_telegram_owner_username') || '');
+  const [telegramPairCode, setTelegramPairCode] = useState<string>(() => localStorage.getItem('cards_telegram_pair_code') || telegramBotManager.getOrCreatePairingCode());
+  const [isTelegramPolling, setIsTelegramPolling] = useState(false);
+
+  // Stable reference for bot handlers to access latest sets
+  const setsRef = useRef(sets);
+  useEffect(() => {
+    setsRef.current = sets;
+  }, [sets]);
 
   // Subscribe to auth state changes for Google token
   useEffect(() => {
@@ -200,6 +217,159 @@ export default function App() {
     await signOutGoogle();
     setViewState({ view: 'home' });
     setIsAuthOpen(false);
+  };
+
+  // Initialize and manage Telegram Bot from Google Sheets (cards_telegram) with strict owner access
+  const isInitializingTgRef = useRef(false);
+
+  const initTelegramBot = useCallback(async (tokenToUse?: string) => {
+    if (isInitializingTgRef.current && !tokenToUse) return;
+    isInitializingTgRef.current = true;
+
+    try {
+      let token = tokenToUse;
+      let username = telegramUsername;
+
+      const config = await api.getTelegramConfig();
+      if (!token) {
+        token = config.botToken;
+        if (config.botUsername) username = config.botUsername;
+      }
+      if (config.ownerUserId) setTelegramOwnerId(config.ownerUserId);
+      if (config.ownerUsername) setTelegramOwnerUsername(config.ownerUsername);
+      if (config.pairingCode) setTelegramPairCode(config.pairingCode);
+
+      if (token) {
+        setTelegramToken(token);
+        if (username) setTelegramUsername(username);
+
+        try {
+          const info = await telegramBotManager.start(
+            token,
+            {
+              getSets: () => setsRef.current,
+              onAddCard: async (setId, term, definition) => {
+                const currentSets: StudySet[] = setsRef.current;
+                const targetSet = currentSets.find((s: StudySet) => s.id === setId);
+                if (!targetSet) {
+                  return { success: false, setTitle: '', totalCards: 0, error: 'Set not found' };
+                }
+
+                const newTerm: Term = {
+                  id: `term-tg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                  term: term.trim(),
+                  definition: definition.trim(),
+                  starred: false,
+                };
+
+                const updatedSet: StudySet = {
+                  ...targetSet,
+                  terms: [...targetSet.terms, newTerm],
+                  updatedAt: Date.now(),
+                };
+
+                const updatedSets = currentSets.map((s: StudySet) => (s.id === setId ? updatedSet : s));
+                setSets(updatedSets);
+                saveStoredSets(updatedSets);
+
+                // Push directly to Google Sheets
+                api.saveSet(updatedSet).catch((e) => console.warn('Failed saving telegram card to sheets:', e));
+
+                return {
+                  success: true,
+                  setTitle: updatedSet.title,
+                  totalCards: updatedSet.terms.length,
+                };
+              },
+              onCreateSet: async (title) => {
+                const newSet: StudySet = {
+                  id: `set-tg-${Date.now()}`,
+                  title: title.trim(),
+                  description: 'Created via Telegram Bot',
+                  author: currentUser?.name || 'Telegram User',
+                  tags: ['Telegram'],
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                  terms: [],
+                };
+
+                const updatedSets = [newSet, ...setsRef.current];
+                setSets(updatedSets);
+                saveStoredSets(updatedSets);
+
+                // Push directly to Google Sheets
+                api.saveSet(newSet).catch((e) => console.warn('Failed saving telegram set to sheets:', e));
+
+                return { success: true, newSet };
+              },
+              getStats: () => getStoredStats(),
+              onOwnerPaired: async (pairedUserId, pairedUsername) => {
+                setTelegramOwnerId(pairedUserId);
+                if (pairedUsername) setTelegramOwnerUsername(pairedUsername);
+                await api.saveTelegramConfig({
+                  botToken: token,
+                  botUsername: username,
+                  ownerUserId: pairedUserId,
+                  ownerUsername: pairedUsername,
+                  pairingCode: config.pairingCode || telegramPairCode,
+                });
+              },
+            },
+            {
+              ownerUserId: config.ownerUserId,
+              ownerUsername: config.ownerUsername,
+              pairingCode: config.pairingCode || telegramPairCode,
+            }
+          );
+
+          setIsTelegramPolling(true);
+          setTelegramUsername(info.username);
+          localStorage.setItem('cards_telegram_username', info.username);
+        } catch (err) {
+          console.warn('[Telegram Bot] Auto-start failed:', err);
+          setIsTelegramPolling(false);
+        }
+      }
+    } finally {
+      isInitializingTgRef.current = false;
+    }
+  }, [currentUser, telegramUsername, telegramPairCode]);
+
+  useEffect(() => {
+    initTelegramBot();
+  }, [initTelegramBot]);
+
+  const handleSaveTelegramConfig = async (config: {
+    botToken: string;
+    botUsername?: string;
+    ownerUserId?: string;
+    ownerUsername?: string;
+    pairingCode?: string;
+  }) => {
+    setTelegramToken(config.botToken);
+    if (config.botUsername) setTelegramUsername(config.botUsername);
+    if (config.ownerUserId !== undefined) setTelegramOwnerId(config.ownerUserId || '');
+    if (config.ownerUsername !== undefined) setTelegramOwnerUsername(config.ownerUsername || '');
+    if (config.pairingCode) setTelegramPairCode(config.pairingCode);
+
+    telegramBotManager.setAccessControl({
+      ownerUserId: config.ownerUserId,
+      ownerUsername: config.ownerUsername,
+      pairingCode: config.pairingCode,
+    });
+
+    await api.saveTelegramConfig(config);
+    await initTelegramBot(config.botToken);
+  };
+
+  const handleDeleteTelegramToken = async () => {
+    telegramBotManager.stop();
+    setTelegramToken('');
+    setTelegramUsername('');
+    setTelegramOwnerId('');
+    setTelegramOwnerUsername('');
+    setIsTelegramPolling(false);
+    await api.deleteTelegramConfig();
   };
 
   // Handle study session stats recording
@@ -364,6 +534,15 @@ export default function App() {
           }
           setIsFolderOpen(true);
         }}
+        onOpenTelegramModal={() => {
+          if (!currentUser) {
+            handleDirectSignIn();
+            return;
+          }
+          setIsTelegramOpen(true);
+        }}
+        hasTelegramToken={!!telegramToken}
+        isTelegramPolling={isTelegramPolling}
         onOpenAuth={() => setIsAuthOpen(true)}
         onLogout={handleLogout}
         onNavigateHome={() => {
@@ -653,6 +832,21 @@ export default function App() {
         onLogin={handleLogin}
         onLogout={handleLogout}
       />
+
+      {isTelegramOpen && (
+        <TelegramBotModal
+          isOpen={isTelegramOpen}
+          onClose={() => setIsTelegramOpen(false)}
+          botToken={telegramToken}
+          botUsername={telegramUsername}
+          ownerUserId={telegramOwnerId}
+          ownerUsername={telegramOwnerUsername}
+          pairingCode={telegramPairCode}
+          sets={sets}
+          onSaveConfig={handleSaveTelegramConfig}
+          onDeleteToken={handleDeleteTelegramToken}
+        />
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-200 dark:border-slate-800 py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400">

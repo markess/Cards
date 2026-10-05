@@ -6,6 +6,11 @@ import {
   ensureCardsLibraryFile,
   ensureCardsSetsFile,
   ensureCardsFoldersFile,
+  ensureCardsTelegramFile,
+  loadTelegramConfigFromGoogle,
+  saveTelegramConfigToGoogle,
+  deleteTelegramConfigFromGoogle,
+  TelegramConfig,
   loadFoldersFromGoogleSheets,
   saveFolderToGoogleSheets,
   deleteFolderFromGoogleSheets,
@@ -150,11 +155,12 @@ export const api = {
     }
 
     try {
-      // 1. Ensure all 3 spreadsheets exist in Drive: cards_library, cards_sets, cards_folders
+      // 1. Ensure all 4 spreadsheets exist in Drive: cards_library, cards_sets, cards_folders, cards_telegram
       await Promise.all([
         ensureCardsLibraryFile(),
         ensureCardsSetsFile(),
         ensureCardsFoldersFile(),
+        ensureCardsTelegramFile(),
       ]);
 
       // 2. Fetch remote sets & folders from Google Sheets in parallel
@@ -226,11 +232,91 @@ export const api = {
     saveStoredStats(stats);
   },
 
-  // Check and setup Google Sheets files
-  async initializeGoogleSheetsFiles(): Promise<{ libraryFileId: string; setsFileId: string; foldersFileId: string }> {
+  // Check and setup Google Sheets files (cards_library, cards_sets, cards_folders, cards_telegram)
+  async initializeGoogleSheetsFiles(): Promise<{
+    libraryFileId: string;
+    setsFileId: string;
+    foldersFileId: string;
+    telegramFileId: string;
+  }> {
     const libraryFileId = await ensureCardsLibraryFile();
     const setsFileId = await ensureCardsSetsFile();
     const foldersFileId = await ensureCardsFoldersFile();
-    return { libraryFileId, setsFileId, foldersFileId };
+    const telegramFileId = await ensureCardsTelegramFile();
+    return { libraryFileId, setsFileId, foldersFileId, telegramFileId };
+  },
+
+  // Telegram Bot Token Configuration & Owner Access Control
+  async getTelegramConfig(): Promise<TelegramConfig> {
+    const token = getCachedGoogleToken();
+    if (token) {
+      try {
+        const config = await loadTelegramConfigFromGoogle();
+        if (config.botToken) {
+          localStorage.setItem('cards_telegram_token', config.botToken);
+          if (config.botUsername) localStorage.setItem('cards_telegram_username', config.botUsername);
+          if (config.ownerUserId) localStorage.setItem('cards_telegram_owner_id', config.ownerUserId);
+          if (config.ownerUsername) localStorage.setItem('cards_telegram_owner_username', config.ownerUsername);
+          if (config.pairingCode) localStorage.setItem('cards_telegram_pair_code', config.pairingCode);
+          return config;
+        }
+      } catch (e) {
+        console.warn('Failed loading telegram config from Google Sheets:', e);
+      }
+    }
+    const localToken = localStorage.getItem('cards_telegram_token') || '';
+    const localUsername = localStorage.getItem('cards_telegram_username') || undefined;
+    const localOwnerId = localStorage.getItem('cards_telegram_owner_id') || undefined;
+    const localOwnerUsername = localStorage.getItem('cards_telegram_owner_username') || undefined;
+    const localPairCode = localStorage.getItem('cards_telegram_pair_code') || undefined;
+    return {
+      botToken: localToken,
+      botUsername: localUsername,
+      ownerUserId: localOwnerId,
+      ownerUsername: localOwnerUsername,
+      pairingCode: localPairCode,
+    };
+  },
+
+  async saveTelegramConfig(config: TelegramConfig): Promise<void> {
+    const trimmed = config.botToken.trim();
+    localStorage.setItem('cards_telegram_token', trimmed);
+    if (config.botUsername) localStorage.setItem('cards_telegram_username', config.botUsername.trim());
+    else localStorage.removeItem('cards_telegram_username');
+
+    if (config.ownerUserId) localStorage.setItem('cards_telegram_owner_id', config.ownerUserId.trim());
+    else localStorage.removeItem('cards_telegram_owner_id');
+
+    if (config.ownerUsername) localStorage.setItem('cards_telegram_owner_username', config.ownerUsername.trim());
+    else localStorage.removeItem('cards_telegram_owner_username');
+
+    if (config.pairingCode) localStorage.setItem('cards_telegram_pair_code', config.pairingCode.trim());
+    else localStorage.removeItem('cards_telegram_pair_code');
+
+    const token = getCachedGoogleToken();
+    if (token) {
+      try {
+        await saveTelegramConfigToGoogle(config);
+      } catch (e) {
+        console.warn('Failed saving telegram config to Google Sheets (saved locally):', e);
+      }
+    }
+  },
+
+  async deleteTelegramConfig(): Promise<void> {
+    localStorage.removeItem('cards_telegram_token');
+    localStorage.removeItem('cards_telegram_username');
+    localStorage.removeItem('cards_telegram_owner_id');
+    localStorage.removeItem('cards_telegram_owner_username');
+    localStorage.removeItem('cards_telegram_pair_code');
+
+    const token = getCachedGoogleToken();
+    if (token) {
+      try {
+        await deleteTelegramConfigFromGoogle();
+      } catch (e) {
+        console.warn('Failed deleting telegram config from Google Sheets (deleted locally):', e);
+      }
+    }
   },
 };

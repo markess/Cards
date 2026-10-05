@@ -27,7 +27,10 @@ import {
   Lock,
   Moon,
   Smartphone,
-  ServerOff
+  ServerOff,
+  Globe,
+  ArrowRightLeft,
+  Send
 } from 'lucide-react';
 import { AuthUser } from '../types';
 
@@ -271,14 +274,31 @@ export const AboutView: React.FC<AboutViewProps> = ({
                 <Download className="w-5 h-5" />
               </div>
               <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                Import, Export & Folders
+                Quenti Import, TSV Export & Folders
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                1-click Quizlet and quenti.io set import, tabular text export, organizational folders, and star bookmarks for focused revision.
+                1-click Quenti study set import accelerated by a dedicated Cloudflare Worker edge proxy. Includes dual-mode input (URL or raw text/JSON with column swapping), tabular TSV/CSV export, and folder categorization.
               </p>
               <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1">
                 <Check className="w-3.5 h-3.5" />
-                <span>Quizlet Interoperability • Folder Sorting</span>
+                <span>Quenti Cloudflare Proxy • Dual Import Modes</span>
+              </div>
+            </div>
+
+            {/* Telegram Bot Card */}
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-500/50 transition-colors space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-500 flex items-center justify-center">
+                <Send className="w-5 h-5 -rotate-12" />
+              </div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                Telegram Bot Integration
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Control your cards on-the-go from Telegram! Send words like <code className="font-mono text-indigo-500">word - translation</code> to instantly add them to your active set, create sets with <code className="font-mono text-indigo-500">/newset</code>, and view study decks with <code className="font-mono text-indigo-500">/sets</code>.
+              </p>
+              <div className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" />
+                <span>Google Drive cards_telegram • Private Owner Access Control (Silent Drop for Strangers)</span>
               </div>
             </div>
           </div>
@@ -489,6 +509,38 @@ export const AboutView: React.FC<AboutViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Tech Item 7: Cloudflare Workers (Edge CORS Proxy) */}
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                      Cloudflare Workers (Edge CORS Proxy)
+                    </h4>
+                    <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                      Serverless Edge Relay &amp; Cross-Origin Resource Sharing
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-orange-100 dark:bg-orange-950 text-orange-800 dark:text-orange-300">
+                  Edge Network
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                <div>
+                  <strong className="text-slate-900 dark:text-slate-200 block mb-1">Purpose:</strong>
+                  Enables static client-side web apps (such as those hosted on GitHub Pages) to import public flashcard sets from Quenti without triggering browser Same-Origin Policy (CORS) blocks.
+                </div>
+                <div>
+                  <strong className="text-slate-900 dark:text-slate-200 block mb-1">Implementation:</strong>
+                  A lightweight serverless edge worker (`quenti-cors-proxy.maxim1nts.workers.dev`) handles HTTP preflight OPTIONS requests, fetches public tRPC procedures from Quenti server-to-server, and returns JSON payloads with valid `Access-Control-Allow-Origin: *` headers. No cards or user credentials are ever stored.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -550,9 +602,9 @@ export const AboutView: React.FC<AboutViewProps> = ({
                   <span>STEP 4</span>
                   <Cloud className="w-4 h-4" />
                 </div>
-                <div className="font-bold text-sm text-white">Google Sheets on Drive</div>
+                <div className="font-bold text-sm text-white">Google Sheets &amp; Drive</div>
                 <div className="text-xs text-slate-400 leading-relaxed">
-                  Cards synchronize straight into your own Google Drive spreadsheet.
+                  Cards, folders, sets &amp; Telegram bot keys synchronize into your Google Drive files (<code>cards_library</code>, <code>cards_sets</code>, <code>cards_folders</code>, <code>cards_telegram</code>).
                 </div>
               </div>
             </div>
@@ -586,6 +638,55 @@ export const AboutView: React.FC<AboutViewProps> = ({
                 </div>
                 <p className="text-slate-400">
                   If network disconnects or if the user chooses not to log in, all flashcards and studies remain fully functional.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cross-Origin Import & Cloudflare Worker Edge Proxy Card */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                  Edge Relay Architecture
+                </div>
+                <h4 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>External Set Import &amp; Cloudflare Worker CORS Proxy</span>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+                  How Cards enables instant 1-click importing of public flashcard sets on static hosting platforms like GitHub Pages.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 flex items-center justify-center font-bold text-[10px]">1</span>
+                  <span>The Static Hosting Challenge</span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                  On static hosts (GitHub Pages), there is no backend Node.js server. When a browser initiates a cross-domain request to <code className="font-mono text-indigo-500">app.quenti.io</code>, browser Same-Origin Policy (SOP) blocks reading the JSON response because the target host does not supply cross-origin headers.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 flex items-center justify-center font-bold text-[10px]">2</span>
+                  <span>Cloudflare Worker Edge Relay</span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                  A high-speed, serverless Cloudflare Worker (<code className="font-mono text-orange-500">quenti-cors-proxy.maxim1nts.workers.dev</code>) receives the request, fetches Quenti's public tRPC endpoint server-to-server (unrestricted by browser CORS), appends <code className="font-mono text-emerald-500">Access-Control-Allow-Origin: *</code>, and safely returns the cards.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center font-bold text-[10px]">3</span>
+                  <span>Zero-Trust Privacy &amp; Fallback</span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                  The edge worker is completely stateless: zero logging, zero caching, and zero persistent storage. If offline or proxy-restricted, the app provides a direct dual-mode fallback: paste raw tab-separated text or JSON directly with instant card preview and column flipping.
                 </p>
               </div>
             </div>

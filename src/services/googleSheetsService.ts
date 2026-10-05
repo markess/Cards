@@ -706,3 +706,176 @@ export async function deleteSetFromGoogleSheets(setId: string, tokenOverride?: s
     console.warn('[Google Sheets] Failed deleting set from sheets (deleted locally):', err);
   }
 }
+
+/**
+ * Ensure `cards_telegram` spreadsheet exists on Google Drive.
+ * Structure of cards_telegram:
+ * - Columns: [Key, Value, Updated At]
+ * - Contains the Telegram Bot Token for controlling the app via Telegram.
+ */
+export async function ensureCardsTelegramFile(tokenOverride?: string): Promise<string> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) return '';
+
+  let fileId = await findSpreadsheetByName('cards_telegram', tokenOverride);
+  if (!fileId) {
+    console.log('[Google Sheets] cards_telegram not found. Creating new spreadsheet on Google Drive...');
+    fileId = await createSpreadsheet(
+      'cards_telegram',
+      ['Key', 'Value', 'Updated At'],
+      tokenOverride
+    );
+    console.log('[Google Sheets] cards_telegram created with ID:', fileId);
+
+    // Seed default rows
+    try {
+      const headers = getAuthHeaders(tokenOverride);
+      const sheetTitle = await getFirstSheetTitle(fileId, tokenOverride);
+      const range = encodeURIComponent(`'${sheetTitle}'!A2:C3`);
+      const updateUrl = `${SHEETS_API_BASE}/${fileId}/values/${range}?valueInputOption=USER_ENTERED`;
+      await fetch(updateUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          values: [
+            ['bot_token', '', new Date().toISOString()],
+            ['bot_username', '', new Date().toISOString()],
+          ],
+        }),
+      });
+    } catch (e) {
+      console.warn('[Google Sheets] Failed to initialize default rows in cards_telegram:', e);
+    }
+  }
+  return fileId;
+}
+
+export interface TelegramConfig {
+  botToken: string;
+  botUsername?: string;
+  ownerUserId?: string;
+  ownerUsername?: string;
+  pairingCode?: string;
+}
+
+/**
+ * Load Telegram bot configuration from `cards_telegram` in Google Sheets
+ */
+export async function loadTelegramConfigFromGoogle(
+  tokenOverride?: string
+): Promise<TelegramConfig> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) {
+    return { botToken: '' };
+  }
+
+  try {
+    const fileId = await ensureCardsTelegramFile(tokenOverride);
+    if (!fileId) return { botToken: '' };
+
+    const sheetTitle = await getFirstSheetTitle(fileId, tokenOverride);
+    const headers = getAuthHeaders(tokenOverride);
+    const range = encodeURIComponent(`'${sheetTitle}'!A2:C10`);
+    const url = `${SHEETS_API_BASE}/${fileId}/values/${range}`;
+
+    const res = await fetch(url, { headers });
+    if (res.status === 401) {
+      clearGoogleToken();
+      clearSheetsFileCache();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) {
+      return { botToken: '' };
+    }
+
+    const data = await res.json();
+    const rows: string[][] = data.values || [];
+
+    const config: TelegramConfig = {
+      botToken: '',
+    };
+
+    rows.forEach((row) => {
+      const key = (row[0] || '').trim();
+      const val = (row[1] || '').trim();
+      if (key === 'bot_token') config.botToken = val;
+      if (key === 'bot_username') config.botUsername = val || undefined;
+      if (key === 'owner_user_id') config.ownerUserId = val || undefined;
+      if (key === 'owner_username') config.ownerUsername = val || undefined;
+      if (key === 'pairing_code') config.pairingCode = val || undefined;
+    });
+
+    return config;
+  } catch (err) {
+    console.warn('[Google Sheets] Failed loading telegram config:', err);
+    return { botToken: '' };
+  }
+}
+
+/**
+ * Save or update Telegram bot token and owner access config in `cards_telegram` in Google Sheets
+ */
+export async function saveTelegramConfigToGoogle(
+  config: TelegramConfig,
+  tokenOverride?: string
+): Promise<void> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) return;
+
+  const fileId = await ensureCardsTelegramFile(tokenOverride);
+  if (!fileId) return;
+
+  const sheetTitle = await getFirstSheetTitle(fileId, tokenOverride);
+  const headers = getAuthHeaders(tokenOverride);
+  const range = encodeURIComponent(`'${sheetTitle}'!A2:C6`);
+  const updateUrl = `${SHEETS_API_BASE}/${fileId}/values/${range}?valueInputOption=USER_ENTERED`;
+
+  const values = [
+    ['bot_token', config.botToken.trim(), new Date().toISOString()],
+    ['bot_username', (config.botUsername || '').trim(), new Date().toISOString()],
+    ['owner_user_id', (config.ownerUserId || '').trim(), new Date().toISOString()],
+    ['owner_username', (config.ownerUsername || '').trim(), new Date().toISOString()],
+    ['pairing_code', (config.pairingCode || '').trim(), new Date().toISOString()],
+  ];
+
+  const res = await fetch(updateUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ values }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to save Telegram config to Google Sheets: ${res.statusText}`);
+  }
+}
+
+/**
+ * Clear/delete Telegram bot token from `cards_telegram` in Google Sheets
+ */
+export async function deleteTelegramConfigFromGoogle(tokenOverride?: string): Promise<void> {
+  const token = tokenOverride || getCachedGoogleToken();
+  if (!token) return;
+
+  const fileId = await ensureCardsTelegramFile(tokenOverride);
+  if (!fileId) return;
+
+  const sheetTitle = await getFirstSheetTitle(fileId, tokenOverride);
+  const headers = getAuthHeaders(tokenOverride);
+  const range = encodeURIComponent(`'${sheetTitle}'!A2:C6`);
+  const updateUrl = `${SHEETS_API_BASE}/${fileId}/values/${range}?valueInputOption=USER_ENTERED`;
+
+  const values = [
+    ['bot_token', '', new Date().toISOString()],
+    ['bot_username', '', new Date().toISOString()],
+    ['owner_user_id', '', new Date().toISOString()],
+    ['owner_username', '', new Date().toISOString()],
+    ['pairing_code', '', new Date().toISOString()],
+  ];
+
+  await fetch(updateUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ values }),
+  });
+}
+

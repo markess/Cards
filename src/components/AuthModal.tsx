@@ -15,6 +15,7 @@ import {
   ensureCardsLibraryFile,
   ensureCardsSetsFile,
   ensureCardsFoldersFile,
+  ensureCardsTelegramFile,
 } from '../services/googleSheetsService';
 
 interface AuthModalProps {
@@ -53,12 +54,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const userName = user.displayName || userEmail.split('@')[0];
       const userPicture = user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userEmail)}`;
 
-      setStatusMessage('Checking Google Drive for "cards_library", "cards_sets" & "cards_folders"...');
+      setStatusMessage('Checking Google Drive for "cards_library", "cards_sets", "cards_folders" & "cards_telegram"...');
 
-      // 2. Check or create cards_library, cards_sets, and cards_folders files in Google Drive / Sheets
+      // 2. Check or create cards_library, cards_sets, cards_folders, and cards_telegram files in Google Drive / Sheets
       await ensureCardsLibraryFile(accessToken);
       await ensureCardsSetsFile(accessToken);
       await ensureCardsFoldersFile(accessToken);
+      await ensureCardsTelegramFile(accessToken);
 
       const authUser: AuthUser = {
         id: user.uid,
